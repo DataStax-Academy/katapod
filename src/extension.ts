@@ -6,7 +6,8 @@ const fs = require('fs');
 const markdownIt = require('markdown-it');
 const markdownItAttrs = require('markdown-it-attrs');
 
-let terminal: vscode.Terminal;
+let terminals: vscode.Terminal[];
+let kpConfig: any;
 let panel: vscode.WebviewPanel;
 let lastStep: string;
 
@@ -28,13 +29,73 @@ export function activate(context: vscode.ExtensionContext) {
 function start (command?: any) {
 	vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns');
 
-	panel = createPanel();
-	log('debug', panel.viewType);
-	loadPage({ 'step': 'intro' });
+	readKatapodConfig().then(
+		cfg => {
+			kpConfig = cfg;
+			log('debug', `KP config : ${JSON.stringify(kpConfig)}`);
 
-	terminal = createTerminal();
+			panel = createPanel();
+			log('debug', panel.viewType);
+			loadPage({ 'step': 'intro' });
 
-	wait();
+			setTerminalLayout(kpConfig).then(
+				ts => {
+					terminals = ts;
+					log('debug', 'terminals set.');
+					wait();
+					log('debug', 'ready to rock.');
+				},
+				rejected => log('error', rejected)
+			);
+		},
+		rej => log('error', rej)
+	);
+}
+
+function readKatapodConfig(): Promise<any> {
+	// return a complete config object, either from file or with defaults
+
+	const cfgP = new Promise<any>((resolve) => {
+		const defaultKpConfig = {
+			numTerminals: 1,
+			terminalNames: ["cqlsh"],
+			terminalTags: ["cqlsh-editor"]
+		};
+
+		let kpConfig;
+
+		//
+		const kpConfigFile = vscode.Uri.file(path.join(getWorkingDir(), '.katapod_config.json'));
+		vscode.workspace.fs.stat(kpConfigFile).then(
+			function(){
+				log('debug', 'Reading KP config file');
+				//
+				let cfgFromFile;
+				try {
+					cfgFromFile = JSON.parse(fs.readFileSync(kpConfigFile.path, 'utf8'));
+				} catch {
+					log('error', 'Unparseable katapod config file');
+					cfgFromFile = {};
+				}
+				//
+				kpConfig = {
+					// defaults
+					...defaultKpConfig,
+					// + overrides
+					...cfgFromFile
+				};
+				resolve(kpConfig);
+			},
+			function () {
+				log('debug', 'KP config file not found');
+				// defaults only
+				kpConfig = defaultKpConfig;
+				resolve(kpConfig);
+			}
+		);
+	});
+
+	return cfgP;
 }
 
 function wait () {
@@ -42,7 +103,7 @@ function wait () {
 	vscode.workspace.fs.stat(waitsh).then(
 		function(){
 			log('debug', 'Executing wait.sh...');
-			terminal.sendText('clear; ./wait.sh');
+			terminals[0].sendText('clear; ./wait.sh');
 		}, 
 		function () {log('debug', 'Skipping wait, wait.sh not found.');}
 	);
@@ -53,7 +114,7 @@ function createPanel () {
 	return vscode.window.createWebviewPanel(
 		'datastax.katapod',
 		'DataStax Training Grounds',
-		vscode.ViewColumn.Beside,
+		vscode.ViewColumn.One,
 		{
 			enableCommandUris: true,
 			enableScripts: true,
@@ -63,19 +124,85 @@ function createPanel () {
 	);
 }
 
-function createTerminal() {
-	log('debug', 'Creating terminal...');
+function setTerminalLayout(config: any): Promise<vscode.Terminal[]> {
+	// return a Promise of an array of Terminal objects
+	// TODO: write this mess with arbitrary number of nested promises (LOL)
 
-	const locationOptions: vscode.TerminalEditorLocationOptions = {
-		viewColumn: vscode.ViewColumn.Beside
-	};
+	const numTerminals: number = config.numTerminals;
 
-	const options: vscode.TerminalOptions = {
-		name: 'cqlsh-editor',
-		location: locationOptions
-	};
+	var terminalsP = new Promise<vscode.Terminal[]>((resolve, reject) => {
+		if (numTerminals === 1){
+			vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns').then(
+				function () {
+					vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup').then(
+						function () {
+							let t0: vscode.Terminal;
 
-	return vscode.window.createTerminal(options);
+							log('debug', 'T0 ...');
+							const locationOptions: vscode.TerminalEditorLocationOptions = {
+								viewColumn: vscode.ViewColumn.Two
+							};
+							const termName: string = config.terminalNames[0] || `terminal-${0 + 1}`;
+							const options: vscode.TerminalOptions = {
+								name: termName,
+								location: locationOptions
+							};
+							t0 = vscode.window.createTerminal(options);
+
+							resolve([t0]);
+						}
+					);
+				}
+			);
+		} else if (numTerminals === 2) {
+			vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns').then(
+				function () {
+					vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup').then(
+						function () {
+							vscode.commands.executeCommand('workbench.action.splitEditorDown').then(
+								function() {
+
+									let t0: vscode.Terminal;
+									let t1: vscode.Terminal;
+
+									log('debug', 'T0 ...');
+									const locationOptions: vscode.TerminalEditorLocationOptions = {
+										viewColumn: vscode.ViewColumn.Two
+									};
+									const termName: string = config.terminalNames[0] || `terminal-${0 + 1}`;
+									const options: vscode.TerminalOptions = {
+										name: termName,
+										location: locationOptions
+									};
+									t0 = vscode.window.createTerminal(options);
+
+									//
+
+									log('debug', 'T1 ...');
+									const locationOptions2: vscode.TerminalEditorLocationOptions = {
+										viewColumn: vscode.ViewColumn.Three
+									};
+									const termName2: string = config.terminalNames[1] || `terminal-${1 + 1}`;
+									const options2: vscode.TerminalOptions = {
+										name: termName2,
+										location: locationOptions2
+									};
+									t1 = vscode.window.createTerminal(options2);
+
+									resolve([t0, t1]);
+
+								}
+							);
+						}
+					);
+				}
+			);
+		} else {
+			reject(new Error('numTerminals supports only values 1 and 2.'));
+		}
+	});
+
+	return terminalsP;
 }
 
 interface Target {
@@ -104,7 +231,9 @@ function loadPage (target: Target) {
 		if (info) { // Fallback to the default processor
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
 		}
-	  
+
+		log('debug', JSON.stringify(tokens[idx]));
+
 		return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
 				renderCommandUri(tokens[idx].content) + '">▶</a>' + 
 				md.utils.escapeHtml(tokens[idx].content) +
@@ -146,7 +275,12 @@ function loadPage (target: Target) {
 }
 
 function sendText (command: any) {
-	terminal.sendText(command.command);
+	let terminalIndex: number = command.terminal_index || 1;
+	if (terminalIndex >= terminals.length){
+		log('error', `Terminal index in command too high. Forcing it ${terminalIndex} --> ${terminals.length - 1}`);
+		terminalIndex = terminals.length - 1;
+	}
+	terminals[terminalIndex].sendText(command.command);
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
