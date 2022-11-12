@@ -7,6 +7,7 @@ const markdownIt = require('markdown-it');
 const markdownItAttrs = require('markdown-it-attrs');
 
 let terminals: vscode.Terminal[];
+let terminalMap: any;
 let kpConfig: any;
 let panel: vscode.WebviewPanel;
 let lastStep: string;
@@ -39,9 +40,12 @@ function start (command?: any) {
 			loadPage({ 'step': 'intro' });
 
 			setTerminalLayout(kpConfig).then(
-				ts => {
-					terminals = ts;
+				tm => {
+					terminalMap = tm;
+					terminals = kpConfig.terminalTags.map( (tt: string) => tm[tt] );
 					log('debug', 'terminals set.');
+					log('debug', `terminalMap ${JSON.stringify(terminalMap)}`);
+					log('debug', `terminals ${JSON.stringify(terminals)}`);
 					wait();
 					log('debug', 'ready to rock.');
 				},
@@ -124,13 +128,13 @@ function createPanel () {
 	);
 }
 
-function setTerminalLayout(config: any): Promise<vscode.Terminal[]> {
-	// return a Promise of an array of Terminal objects
+function setTerminalLayout(config: any): Promise<any> {
+	// return a Promise of a map string->Terminal for the created objects
 	// TODO: write this mess with arbitrary number of nested promises (LOL)
 
 	const numTerminals: number = config.numTerminals;
 
-	var terminalsP = new Promise<vscode.Terminal[]>((resolve, reject) => {
+	var terminalsP = new Promise<any>((resolve, reject) => {
 		if (numTerminals === 1){
 			vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns').then(
 				function () {
@@ -143,13 +147,14 @@ function setTerminalLayout(config: any): Promise<vscode.Terminal[]> {
 								viewColumn: vscode.ViewColumn.Two
 							};
 							const termName: string = config.terminalNames[0] || `terminal-${0 + 1}`;
+							const termTag: string = config.terminalTags[0] || `term${0 + 1}`;
 							const options: vscode.TerminalOptions = {
 								name: termName,
 								location: locationOptions
 							};
 							t0 = vscode.window.createTerminal(options);
 
-							resolve([t0]);
+							resolve({[termTag]: t0});
 						}
 					);
 				}
@@ -170,6 +175,7 @@ function setTerminalLayout(config: any): Promise<vscode.Terminal[]> {
 										viewColumn: vscode.ViewColumn.Two
 									};
 									const termName: string = config.terminalNames[0] || `terminal-${0 + 1}`;
+									const termTag: string = config.terminalTags[0] || `term${0 + 1}`;
 									const options: vscode.TerminalOptions = {
 										name: termName,
 										location: locationOptions
@@ -179,17 +185,21 @@ function setTerminalLayout(config: any): Promise<vscode.Terminal[]> {
 									//
 
 									log('debug', 'T1 ...');
-									const locationOptions2: vscode.TerminalEditorLocationOptions = {
+									const locationOptions1: vscode.TerminalEditorLocationOptions = {
 										viewColumn: vscode.ViewColumn.Three
 									};
-									const termName2: string = config.terminalNames[1] || `terminal-${1 + 1}`;
-									const options2: vscode.TerminalOptions = {
-										name: termName2,
-										location: locationOptions2
+									const termName1: string = config.terminalNames[1] || `terminal-${1 + 1}`;
+									const termTag1: string = config.terminalTags[1] || `term${0 + 1}`;
+									const options1: vscode.TerminalOptions = {
+										name: termName1,
+										location: locationOptions1
 									};
-									t1 = vscode.window.createTerminal(options2);
+									t1 = vscode.window.createTerminal(options1);
 
-									resolve([t0, t1]);
+									resolve({
+										[termTag]: t0,
+										[termTag1]: t1
+									});
 
 								}
 							);
@@ -275,7 +285,10 @@ function loadPage (target: Target) {
 }
 
 function sendText (command: any) {
-	let terminalIndex: number = command.terminal_index || 1;
+	// pick target terminal
+
+	//
+	let terminalIndex: number = command.terminal_index || 0;
 	if (terminalIndex >= terminals.length){
 		log('error', `Terminal index in command too high. Forcing it ${terminalIndex} --> ${terminals.length - 1}`);
 		terminalIndex = terminals.length - 1;
