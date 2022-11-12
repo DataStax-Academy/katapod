@@ -223,6 +223,30 @@ function reloadPage(command: any) {
 	loadPage({ 'step': lastStep });
 }
 
+function parseCodeBlockContent(cbContent: string) {
+	// filter out lines starting with "###" and make them into the target-terminal-tag directive
+	let targetTermTag: string = '';
+	const lines = cbContent.split('\n');
+	let cleanContent: string[] = [];
+	lines.forEach( (line) => {
+		if (line.slice(0,3) ==='###'){
+			targetTermTag = line.slice(3).trim();
+		}else{
+			cleanContent.push(line);
+		}
+	});
+	if (targetTermTag){
+		return {
+			command: cleanContent.join('\n'),
+			runSettings: {terminal: targetTermTag}
+		};
+	}else{
+		return {
+			command: cleanContent.join('\n')
+		};
+	}
+}
+
 function loadPage (target: Target) {
 	lastStep = target.step;
 
@@ -242,11 +266,14 @@ function loadPage (target: Target) {
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
 		}
 
-		log('debug', JSON.stringify(tokens[idx]));
+		log('debug', `TOKEN => ${JSON.stringify(tokens[idx])}`);
+
+		const parsedContent = parseCodeBlockContent(tokens[idx].content);
+		const {command} = parsedContent;
 
 		return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
-				renderCommandUri(tokens[idx].content) + '">▶</a>' + 
-				md.utils.escapeHtml(tokens[idx].content) +
+				renderCommandUri(parsedContent) + '">▶</a>' + 
+				md.utils.escapeHtml(command) +
 				'</code></pre>\n';
 	};
 
@@ -284,16 +311,25 @@ function loadPage (target: Target) {
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
-function sendText (command: any) {
-	// pick target terminal
-
-	//
-	let terminalIndex: number = command.terminal_index || 0;
-	if (terminalIndex >= terminals.length){
-		log('error', `Terminal index in command too high. Forcing it ${terminalIndex} --> ${terminals.length - 1}`);
-		terminalIndex = terminals.length - 1;
+function sendText (cbContent: any) {
+	// pick target terminal, with care and fallbacks
+	const targetTerminalTag: string = (cbContent.runSettings || {}).terminal;
+	let targetTerminal: vscode.Terminal;
+	if (targetTerminalTag){
+		targetTerminal = terminalMap[targetTerminalTag];
+		if (!targetTerminal){
+			targetTerminal = terminals[0];
+			log('debug', `sendText fails by name and falls to first`);
+		}else{
+			log('debug', `sendText picks terminal by name ${targetTerminalTag}`);
+		}
+	}else{
+		targetTerminal = terminals[0];
+		log('debug', `sendText picks first term by default`);
 	}
-	terminals[terminalIndex].sendText(command.command);
+
+	// run the command
+	targetTerminal.sendText(cbContent.command);
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
@@ -302,8 +338,8 @@ function renderStepUri (step: string) {
 	return uri;
 }
 
-function renderCommandUri (command: string) {
-	const uri = encodeURIComponent(JSON.stringify([{ 'command': command }])).toString();
+function renderCommandUri (parsedCbContent: any) {
+	const uri = encodeURIComponent(JSON.stringify([parsedCbContent])).toString();
 	return uri;
 }
 
