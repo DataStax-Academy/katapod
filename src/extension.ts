@@ -46,7 +46,7 @@ function start (command?: any) {
 					log('debug', 'terminals set.');
 					log('debug', `terminalMap ${JSON.stringify(terminalMap)}`);
 					log('debug', `terminals ${JSON.stringify(terminals)}`);
-					wait();
+					runInitScripts(kpConfig);
 					log('debug', 'ready to rock.');
 				},
 				rejected => log('error', rejected)
@@ -102,15 +102,39 @@ function readKatapodConfig(): Promise<any> {
 	return cfgP;
 }
 
-function wait () {
-	const waitsh = vscode.Uri.file(path.join(getWorkingDir(), 'wait.sh'));
-	vscode.workspace.fs.stat(waitsh).then(
-		function(){
-			log('debug', 'Executing wait.sh...');
-			terminals[0].sendText('clear; ./wait.sh');
-		}, 
-		function () {log('debug', 'Skipping wait, wait.sh not found.');}
-	);
+function runInitScripts (config: any) {
+	if (!config.startup){
+		// legacy mode:
+		const waitsh = vscode.Uri.file(path.join(getWorkingDir(), 'wait.sh'));
+		vscode.workspace.fs.stat(waitsh).then(
+			function(){
+				log('debug', 'Executing wait.sh... (legacy mode)');
+				sendText({
+					runSettings: {
+						terminal: 'cqlsh',
+					},
+					command: './wait.sh',
+				});
+			}, 
+			function () {log('debug', 'Skipping wait, wait.sh not found (legacy mode).');}
+		);
+	} else {
+		const startupScripts = config.startup || {};
+		// this maps terminal tags to startup commands to execute there
+		sendTextsPerTerminal(startupScripts, "startup");
+	}
+}
+
+function sendTextsPerTerminal(commandMap: any, context: string){
+	Object.entries(commandMap).forEach(([terminalTag, command]) => {
+		log('info', `${context}: calling "${command}" on terminal "${terminalTag}"`);
+		sendText({
+			runSettings: {
+				terminal: terminalTag,
+			},
+			command,
+		});
+	});
 }
 
 function createPanel () {
@@ -308,6 +332,11 @@ function loadPage (target: Target) {
 	var result = md.render((fs.readFileSync(file.fsPath, 'utf8')));
 
 	panel.webview.html = pre + result + post;
+
+	// process step-scripts if any
+	const stepScripts = (kpConfig.stepScripts || {})[target.step] || {};
+	sendTextsPerTerminal(stepScripts, `onLoad[${target.step}]`);
+
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
