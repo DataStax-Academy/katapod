@@ -24,20 +24,20 @@ let kpEnvironment: any = {
 	}
 };
 
-export function sendText (cbContent: any) {
+export function sendTextToTerminal (cbContent: any, env: any) {
 	// pick target terminal, with care and fallbacks
 	const targetTerminalTag: string = (cbContent.runSettings || {}).terminal;
 	let targetTerminal: vscode.Terminal;
 	if (targetTerminalTag){
-		targetTerminal = kpEnvironment.components.terminalMap[targetTerminalTag];
+		targetTerminal = env.components.terminalMap[targetTerminalTag];
 		if (!targetTerminal){
-			targetTerminal = kpEnvironment.components.terminals[0];
+			targetTerminal = env.components.terminals[0];
 			log('debug', `sendText fails by name and falls to first`);
 		}else{
 			log('debug', `sendText picks terminal by name ${targetTerminalTag}`);
 		}
 	}else{
-		targetTerminal = kpEnvironment.components.terminals[0];
+		targetTerminal = env.components.terminals[0];
 		log('debug', `sendText picks first term by default`);
 	}
 
@@ -46,34 +46,37 @@ export function sendText (cbContent: any) {
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
-export function sendTextsPerTerminal(commandMap: any, logContext: string){
+export function sendTextsPerTerminal(commandMap: any, env: any, logContext: string){
 	Object.entries(commandMap).forEach(([terminalTag, command]) => {
 		log('info', `${logContext}: calling "${command}" on terminal "${terminalTag}"`);
-		sendText(
+		sendTextToTerminal(
             {
                 runSettings: {
                     terminal: terminalTag,
                 },
                 command,
-            }
+            },
+			env
         );
 	});
 }
 
-export function runInitScripts (config: any) {
+export function runInitScripts (env: any) {
+	let config = env.configuration;
 	if (!config.startup){
 		// legacy mode:
 		const waitsh = vscode.Uri.file(path.join(getWorkingDir(), 'wait.sh'));
 		vscode.workspace.fs.stat(waitsh).then(
 			function(){
 				log('debug', 'Executing wait.sh... (legacy mode)');
-				sendText(
+				sendTextToTerminal(
                     {
                         runSettings: {
                             terminal: 'cqlsh',
                         },
                         command: './wait.sh',
-                    }
+                    },
+					env
                 );
 			}, 
 			function () {log('debug', 'Skipping wait, wait.sh not found (legacy mode).');}
@@ -81,10 +84,13 @@ export function runInitScripts (config: any) {
 	} else {
 		const startupScripts = config.startup || {};
 		// this maps terminal tags to startup commands to execute there
-		sendTextsPerTerminal(startupScripts, "startup");
+		sendTextsPerTerminal(startupScripts, env, "startup");
 	}
 }
 
+function sendText(cbContent: any) {
+	sendTextToTerminal(cbContent, kpEnvironment);
+}
 
 export async function activate(context: vscode.ExtensionContext) {
 	/*
@@ -127,7 +133,7 @@ function start (command?: any) {
 					log('debug', 'terminals set.');
 					log('debug', `terminalMap ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
 					log('debug', `terminals ${JSON.stringify(kpEnvironment.components.terminals)}`);
-					runInitScripts(kpEnvironment.configuration);
+					runInitScripts(kpEnvironment);
 					log('debug', 'ready to rock.');
 				},
 				rejected => log('error', rejected)
@@ -337,7 +343,7 @@ function loadPage (target: Target) {
 
 	// process step-scripts if any
 	const stepScripts = (kpEnvironment.configuration.stepScripts || {})[target.step] || {};
-	sendTextsPerTerminal(stepScripts, `onLoad[${target.step}]`);
+	sendTextsPerTerminal(stepScripts, kpEnvironment, `onLoad[${target.step}]`);
 
 	vscode.commands.executeCommand('notifications.clearAll');
 }
