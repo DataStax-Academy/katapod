@@ -6,26 +6,112 @@ const fs = require('fs');
 const markdownIt = require('markdown-it');
 const markdownItAttrs = require('markdown-it-attrs');
 
+import {readKatapodConfig} from './configuration';
+import {getWorkingDir} from './filesystem';
+import {log} from './logging';
+// import {sendText, sendTextsPerTerminal, runInitScripts} from './runCommands';
+
 let terminals: vscode.Terminal[];
 let terminalMap: any;
 let kpConfig: any;
 let panel: vscode.WebviewPanel;
 let lastStep: string;
 
-export function activate(context: vscode.ExtensionContext) {
-	vscode.commands.executeCommand('notifications.clearAll');
-	vscode.commands.executeCommand('workbench.action.closeSidebar');
-	vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
-	vscode.commands.executeCommand('workbench.action.closePanel');
-	vscode.commands.executeCommand('workbench.action.closeAllEditors').then(start);
+// let kpEnvironment: any = {
+// 	components: {
+// 		terminals: vscode.Terminal[],
+// 		terminalMap: any,
+// 		panel: vscode.WebviewPanel,
+// 	},
+// 	configuration: any,
+// 	state: {
+// 		lastStep: string,
+// 	}
+// };
 
+export function sendText (cbContent: any) {
+	// pick target terminal, with care and fallbacks
+	const targetTerminalTag: string = (cbContent.runSettings || {}).terminal;
+	let targetTerminal: vscode.Terminal;
+	if (targetTerminalTag){
+		targetTerminal = terminalMap[targetTerminalTag];
+		if (!targetTerminal){
+			targetTerminal = terminals[0];
+			log('debug', `sendText fails by name and falls to first`);
+		}else{
+			log('debug', `sendText picks terminal by name ${targetTerminalTag}`);
+		}
+	}else{
+		targetTerminal = terminals[0];
+		log('debug', `sendText picks first term by default`);
+	}
+
+	// run the command
+	targetTerminal.sendText(cbContent.command);
+	vscode.commands.executeCommand('notifications.clearAll');
+}
+
+export function sendTextsPerTerminal(commandMap: any, logContext: string){
+	Object.entries(commandMap).forEach(([terminalTag, command]) => {
+		log('info', `${logContext}: calling "${command}" on terminal "${terminalTag}"`);
+		sendText(
+            {
+                runSettings: {
+                    terminal: terminalTag,
+                },
+                command,
+            }
+        );
+	});
+}
+
+export function runInitScripts (config: any) {
+	if (!config.startup){
+		// legacy mode:
+		const waitsh = vscode.Uri.file(path.join(getWorkingDir(), 'wait.sh'));
+		vscode.workspace.fs.stat(waitsh).then(
+			function(){
+				log('debug', 'Executing wait.sh... (legacy mode)');
+				sendText(
+                    {
+                        runSettings: {
+                            terminal: 'cqlsh',
+                        },
+                        command: './wait.sh',
+                    }
+                );
+			}, 
+			function () {log('debug', 'Skipping wait, wait.sh not found (legacy mode).');}
+		);
+	} else {
+		const startupScripts = config.startup || {};
+		// this maps terminal tags to startup commands to execute there
+		sendTextsPerTerminal(startupScripts, "startup");
+	}
+}
+
+
+export async function activate(context: vscode.ExtensionContext) {
+	/*
+	Nothing seems to prevent this function from being async (which helps fighting nondeterminism in these calls).
+	See https://stackoverflow.com/questions/64640967/can-a-vscode-extension-activate-method-be-async.
+	*/
 	context.subscriptions.push(vscode.commands.registerCommand('katapod.sendText', sendText));
 	context.subscriptions.push(vscode.commands.registerCommand('katapod.loadPage', loadPage));
 	context.subscriptions.push(vscode.commands.registerCommand('katapod.reloadPage', reloadPage));
 	context.subscriptions.push(vscode.commands.registerCommand('katapod.start', start));
 
-	vscode.commands.executeCommand('notifications.clearAll');
+	await vscode.commands.executeCommand('notifications.clearAll');
+	await vscode.commands.executeCommand('workbench.action.closeSidebar');
+	await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
+	await vscode.commands.executeCommand('workbench.action.closePanel');
+	await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+	start();
+	await vscode.commands.executeCommand('notifications.clearAll');
 }
+
+export function deactivate() {}
+
 
 function start (command?: any) {
 	vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns');
@@ -56,86 +142,7 @@ function start (command?: any) {
 	);
 }
 
-function readKatapodConfig(): Promise<any> {
-	// return a complete config object, either from file or with defaults
 
-	const cfgP = new Promise<any>((resolve) => {
-		const defaultKpConfig = {
-			numTerminals: 1,
-			terminalNames: ["cqlsh"],
-			terminalTags: ["cqlsh-editor"]
-		};
-
-		let kpConfig;
-
-		//
-		const kpConfigFile = vscode.Uri.file(path.join(getWorkingDir(), '.katapod_config.json'));
-		vscode.workspace.fs.stat(kpConfigFile).then(
-			function(){
-				log('debug', 'Reading KP config file');
-				//
-				let cfgFromFile;
-				try {
-					cfgFromFile = JSON.parse(fs.readFileSync(kpConfigFile.path, 'utf8'));
-				} catch {
-					log('error', 'Unparseable katapod config file');
-					cfgFromFile = {};
-				}
-				//
-				kpConfig = {
-					// defaults
-					...defaultKpConfig,
-					// + overrides
-					...cfgFromFile
-				};
-				resolve(kpConfig);
-			},
-			function () {
-				log('debug', 'KP config file not found');
-				// defaults only
-				kpConfig = defaultKpConfig;
-				resolve(kpConfig);
-			}
-		);
-	});
-
-	return cfgP;
-}
-
-function runInitScripts (config: any) {
-	if (!config.startup){
-		// legacy mode:
-		const waitsh = vscode.Uri.file(path.join(getWorkingDir(), 'wait.sh'));
-		vscode.workspace.fs.stat(waitsh).then(
-			function(){
-				log('debug', 'Executing wait.sh... (legacy mode)');
-				sendText({
-					runSettings: {
-						terminal: 'cqlsh',
-					},
-					command: './wait.sh',
-				});
-			}, 
-			function () {log('debug', 'Skipping wait, wait.sh not found (legacy mode).');}
-		);
-	} else {
-		const startupScripts = config.startup || {};
-		// this maps terminal tags to startup commands to execute there
-		sendTextsPerTerminal(startupScripts, "startup");
-	}
-}
-
-function sendTextsPerTerminal(commandMap: any, context: string){
-	Object.entries(commandMap).forEach(([terminalTag, command]) => {
-		log('info', `${context}: calling "${command}" on terminal "${terminalTag}"`);
-		sendText({
-			runSettings: {
-				terminal: terminalTag,
-			},
-			command,
-		});
-	});
-}
 
 function createPanel () {
 	log('debug', 'Creating WebView...');
@@ -340,28 +347,6 @@ function loadPage (target: Target) {
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
-function sendText (cbContent: any) {
-	// pick target terminal, with care and fallbacks
-	const targetTerminalTag: string = (cbContent.runSettings || {}).terminal;
-	let targetTerminal: vscode.Terminal;
-	if (targetTerminalTag){
-		targetTerminal = terminalMap[targetTerminalTag];
-		if (!targetTerminal){
-			targetTerminal = terminals[0];
-			log('debug', `sendText fails by name and falls to first`);
-		}else{
-			log('debug', `sendText picks terminal by name ${targetTerminalTag}`);
-		}
-	}else{
-		targetTerminal = terminals[0];
-		log('debug', `sendText picks first term by default`);
-	}
-
-	// run the command
-	targetTerminal.sendText(cbContent.command);
-	vscode.commands.executeCommand('notifications.clearAll');
-}
-
 function renderStepUri (step: string) {
 	const uri = encodeURIComponent(JSON.stringify([{ 'step': step }])).toString();
 	return uri;
@@ -372,17 +357,3 @@ function renderCommandUri (parsedCbContent: any) {
 	return uri;
 }
 
-function getWorkingDir(): string | undefined {
-	if (vscode.workspace.workspaceFolders) {
-		return vscode.workspace.workspaceFolders[0].uri.path;
-	}
-
-	return vscode.workspace.rootPath;
-}
-
-function log (level: string, message: string) {
-	console.log('KataPod ' + level.toUpperCase() + ' ' + message);
-	// vscode.window.showInformationMessage(message);
-}
-
-export function deactivate() {}
