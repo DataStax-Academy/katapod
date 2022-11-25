@@ -11,38 +11,33 @@ import {getWorkingDir} from './filesystem';
 import {log} from './logging';
 // import {sendText, sendTextsPerTerminal, runInitScripts} from './runCommands';
 
-let terminals: vscode.Terminal[];
-let terminalMap: any;
-let kpConfig: any;
-let panel: vscode.WebviewPanel;
-let lastStep: string;
 
-// let kpEnvironment: any = {
-// 	components: {
-// 		terminals: vscode.Terminal[],
-// 		terminalMap: any,
-// 		panel: vscode.WebviewPanel,
-// 	},
-// 	configuration: any,
-// 	state: {
-// 		lastStep: string,
-// 	}
-// };
+let kpEnvironment: any = {
+	components: {
+		terminals: null, // vscode.Terminal[],
+		terminalMap: null, // any,
+		panel: null, // vscode.WebviewPanel,
+	},
+	configuration: null, // any,
+	state: {
+		currentStep: null, // string,
+	}
+};
 
 export function sendText (cbContent: any) {
 	// pick target terminal, with care and fallbacks
 	const targetTerminalTag: string = (cbContent.runSettings || {}).terminal;
 	let targetTerminal: vscode.Terminal;
 	if (targetTerminalTag){
-		targetTerminal = terminalMap[targetTerminalTag];
+		targetTerminal = kpEnvironment.components.terminalMap[targetTerminalTag];
 		if (!targetTerminal){
-			targetTerminal = terminals[0];
+			targetTerminal = kpEnvironment.components.terminals[0];
 			log('debug', `sendText fails by name and falls to first`);
 		}else{
 			log('debug', `sendText picks terminal by name ${targetTerminalTag}`);
 		}
 	}else{
-		targetTerminal = terminals[0];
+		targetTerminal = kpEnvironment.components.terminals[0];
 		log('debug', `sendText picks first term by default`);
 	}
 
@@ -118,21 +113,21 @@ function start (command?: any) {
 
 	readKatapodConfig().then(
 		cfg => {
-			kpConfig = cfg;
-			log('debug', `KP config : ${JSON.stringify(kpConfig)}`);
+			kpEnvironment.configuration = cfg;
+			log('debug', `KP config : ${JSON.stringify(kpEnvironment.configuration)}`);
 
-			panel = createPanel();
-			log('debug', panel.viewType);
+			kpEnvironment.components.panel = createPanel();
+			log('debug', kpEnvironment.components.panel.viewType);
 			loadPage({ 'step': 'intro' });
 
-			setTerminalLayout(kpConfig).then(
+			setTerminalLayout(kpEnvironment.configuration).then(
 				tm => {
-					terminalMap = tm;
-					terminals = kpConfig.terminalTags.map( (tt: string) => tm[tt] );
+					kpEnvironment.components.terminalMap = tm;
+					kpEnvironment.components.terminals = kpEnvironment.configuration.terminalTags.map( (tt: string) => tm[tt] );
 					log('debug', 'terminals set.');
-					log('debug', `terminalMap ${JSON.stringify(terminalMap)}`);
-					log('debug', `terminals ${JSON.stringify(terminals)}`);
-					runInitScripts(kpConfig);
+					log('debug', `terminalMap ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
+					log('debug', `terminals ${JSON.stringify(kpEnvironment.components.terminals)}`);
+					runInitScripts(kpEnvironment.configuration);
 					log('debug', 'ready to rock.');
 				},
 				rejected => log('error', rejected)
@@ -251,7 +246,7 @@ interface Target {
 }
 
 function reloadPage(command: any) {
-	loadPage({ 'step': lastStep });
+	loadPage({ 'step': kpEnvironment.state.currentStep });
 }
 
 function parseCodeBlockContent(cbContent: string) {
@@ -279,7 +274,7 @@ function parseCodeBlockContent(cbContent: string) {
 }
 
 function loadPage (target: Target) {
-	lastStep = target.step;
+	kpEnvironment.state.currentStep = target.step;
 
 	const file = vscode.Uri.file(path.join(getWorkingDir(), target.step + '.md'));
 
@@ -338,10 +333,10 @@ function loadPage (target: Target) {
 	const post = `</body></html>`;
 	var result = md.render((fs.readFileSync(file.fsPath, 'utf8')));
 
-	panel.webview.html = pre + result + post;
+	kpEnvironment.components.panel.webview.html = pre + result + post;
 
 	// process step-scripts if any
-	const stepScripts = (kpConfig.stepScripts || {})[target.step] || {};
+	const stepScripts = (kpEnvironment.configuration.stepScripts || {})[target.step] || {};
 	sendTextsPerTerminal(stepScripts, `onLoad[${target.step}]`);
 
 	vscode.commands.executeCommand('notifications.clearAll');
