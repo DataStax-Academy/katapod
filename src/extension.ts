@@ -6,7 +6,7 @@ const fs = require('fs');
 const markdownIt = require('markdown-it');
 const markdownItAttrs = require('markdown-it-attrs');
 
-import {readKatapodConfig} from './configuration';
+import {readKatapodConfig, ConfigObject, ConfigTerminal, ConfigCommand} from './configuration';
 import {getWorkingDir} from './filesystem';
 import {log} from './logging';
 import {sendTextToTerminal, sendTextsPerTerminal, runInitScripts} from './runCommands';
@@ -18,7 +18,7 @@ let kpEnvironment: any = {
 		terminalMap: null, // any,
 		panel: null, // vscode.WebviewPanel,
 	},
-	configuration: null, // any,
+	configuration: null, // ConfigObject,
 	state: {
 		currentStep: null, // string,
 	}
