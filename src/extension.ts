@@ -126,7 +126,7 @@ function loadPage (target: Target) {
 	};
 
 	const pre = `<!DOCTYPE html>
-	<html lang="en">
+<html lang="en">
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -138,11 +138,26 @@ function loadPage (target: Target) {
 		<script src="https://datastax-academy.github.io/katapod-shared-assets/quiz/main.js"></script>
 	</head>
 	<body>`;
-	const post = `</body></html>`;
+	const post = `
+		<script>
+			// adapted from: https://code.visualstudio.com/api/extension-guides/webview#scripts-and-message-passing
+			window.addEventListener('message', event => {
+				const message = event.data;
+				switch(message.command){
+					case 'scroll_to_top':
+						window.scrollTo(0, 0);
+						break;
+				}
+			});
+		</script>
+	</body>
+</html>`;
 	var result = md.render((fs.readFileSync(file.fsPath, 'utf8')));
 
 	panel.webview.html = pre + result + post;
-	vscode.commands.executeCommand('notifications.clearAll');
+	vscode.commands.executeCommand('notifications.clearAll').then( () => {
+		panel.webview.postMessage({command: 'scroll_to_top'});
+	});
 }
 
 function sendText (command: any) {
