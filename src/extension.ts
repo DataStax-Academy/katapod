@@ -9,7 +9,8 @@ const markdownItAttrs = require('markdown-it-attrs');
 import {readKatapodConfig, ConfigObject, ConfigTerminal, ConfigCommand} from './configuration';
 import {getWorkingDir} from './filesystem';
 import {log} from './logging';
-import {sendTextToTerminal, sendTextsPerTerminal, runInitScripts} from './runCommands';
+// import {sendTextToTerminal, sendTextsPerTerminal, runInitScripts} from './runCommands';
+import {sendTextToTerminal, sendTextsPerTerminal} from './runCommands';
 
 
 let kpEnvironment: any = {
@@ -56,23 +57,25 @@ function start (command?: any) {
 	vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns');
 
 	readKatapodConfig().then(
-		cfg => {
+		(cfg: ConfigObject) => {
 			kpEnvironment.configuration = cfg;
 			log('debug', `KP config : ${JSON.stringify(kpEnvironment.configuration)}`);
 
 			kpEnvironment.components.panel = createPanel();
-			log('debug', kpEnvironment.components.panel.viewType);
-			loadPage({ 'step': 'intro' });
+			log('debug', `kpEnvironment.components.panel.viewType = ${kpEnvironment.components.panel.viewType}`);
 
 			setTerminalLayout(kpEnvironment.configuration).then(
-				tm => {
-					kpEnvironment.components.terminalMap = tm;
-					kpEnvironment.components.terminals = kpEnvironment.configuration.terminalTags.map( (tt: string) => tm[tt] );
+				terminalMap => {
+					kpEnvironment.components.terminalMap = terminalMap;
+					kpEnvironment.components.terminals = kpEnvironment.configuration.layout.terminals.map( (term: ConfigTerminal) => terminalMap[term.id] );
 					log('debug', 'terminals set.');
 					log('debug', `terminalMap ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
 					log('debug', `terminals ${JSON.stringify(kpEnvironment.components.terminals)}`);
-					runInitScripts(kpEnvironment);
+					// runInitScripts(kpEnvironment);
+					loadPage({ 'step': 'intro' });
+					//
 					log('debug', 'ready to rock.');
+					//
 				},
 				rejected => log('error', rejected)
 			);
@@ -98,11 +101,12 @@ function createPanel () {
 	);
 }
 
-function setTerminalLayout(config: any): Promise<any> {
+async function setTerminalLayout(config: ConfigObject): Promise<any> {
 	// return a Promise of a map string->Terminal for the created objects
 	// TODO: write this mess with arbitrary number of nested promises (LOL)
 
-	const numTerminals: number = config.numTerminals;
+	const configTerminals: Array<ConfigTerminal> = config.layout.terminals;
+	const numTerminals: number = configTerminals.length;
 
 	var terminalsP = new Promise<any>((resolve, reject) => {
 		if (numTerminals === 1){
@@ -116,15 +120,15 @@ function setTerminalLayout(config: any): Promise<any> {
 							const locationOptions: vscode.TerminalEditorLocationOptions = {
 								viewColumn: vscode.ViewColumn.Two
 							};
-							const termName: string = config.terminalNames[0] || `terminal-${0 + 1}`;
-							const termTag: string = config.terminalTags[0] || `term${0 + 1}`;
-							const options: vscode.TerminalOptions = {
-								name: termName,
+							const terminalId: string = configTerminals[0].id;
+							const terminalName: string = configTerminals[0].name || terminalId;
+							const terminalOptions: vscode.TerminalOptions = {
+								name: terminalName,
 								location: locationOptions
 							};
-							t0 = vscode.window.createTerminal(options);
+							t0 = vscode.window.createTerminal(terminalOptions);
 
-							resolve({[termTag]: t0});
+							resolve({[terminalId]: t0});
 						}
 					);
 				}
@@ -144,13 +148,13 @@ function setTerminalLayout(config: any): Promise<any> {
 									const locationOptions: vscode.TerminalEditorLocationOptions = {
 										viewColumn: vscode.ViewColumn.Two
 									};
-									const termName: string = config.terminalNames[0] || `terminal-${0 + 1}`;
-									const termTag: string = config.terminalTags[0] || `term${0 + 1}`;
-									const options: vscode.TerminalOptions = {
-										name: termName,
+									const terminalId: string = configTerminals[0].id;
+									const terminalName: string = configTerminals[0].name || terminalId;
+									const terminalOptions: vscode.TerminalOptions = {
+										name: terminalName,
 										location: locationOptions
 									};
-									t0 = vscode.window.createTerminal(options);
+									t0 = vscode.window.createTerminal(terminalOptions);
 
 									//
 
@@ -158,17 +162,18 @@ function setTerminalLayout(config: any): Promise<any> {
 									const locationOptions1: vscode.TerminalEditorLocationOptions = {
 										viewColumn: vscode.ViewColumn.Three
 									};
-									const termName1: string = config.terminalNames[1] || `terminal-${1 + 1}`;
-									const termTag1: string = config.terminalTags[1] || `term${0 + 1}`;
-									const options1: vscode.TerminalOptions = {
-										name: termName1,
+
+									const terminalId1: string = configTerminals[1].id;
+									const terminalName1: string = configTerminals[1].name || terminalId;
+									const terminalOptions1: vscode.TerminalOptions = {
+										name: terminalName1,
 										location: locationOptions1
 									};
-									t1 = vscode.window.createTerminal(options1);
+									t1 = vscode.window.createTerminal(terminalOptions1);
 
 									resolve({
-										[termTag]: t0,
-										[termTag1]: t1
+										[terminalId]: t0,
+										[terminalId1]: t1
 									});
 
 								}
@@ -195,20 +200,20 @@ function reloadPage(command: any) {
 
 function parseCodeBlockContent(cbContent: string) {
 	// filter out lines starting with "###" and make them into the target-terminal-tag directive
-	let targetTermTag: string = '';
+	let terminalId: string = '';
 	const lines = cbContent.split('\n');
 	let cleanContent: string[] = [];
 	lines.forEach( (line) => {
 		if (line.slice(0,3) ==='###'){
-			targetTermTag = line.slice(3).trim();
+			terminalId = line.slice(3).trim();
 		}else{
 			cleanContent.push(line);
 		}
 	});
-	if (targetTermTag){
+	if (terminalId){
 		return {
 			command: cleanContent.join('\n'),
-			runSettings: {terminal: targetTermTag}
+			runSettings: {terminalId: terminalId}
 		};
 	}else{
 		return {
@@ -280,7 +285,7 @@ function loadPage (target: Target) {
 	kpEnvironment.components.panel.webview.html = pre + result + post;
 
 	// process step-scripts if any
-	const stepScripts = (kpEnvironment.configuration.stepScripts || {})[target.step] || {};
+	const stepScripts = (kpEnvironment.configuration.navigation?.onLoadCommands || {})[target.step] || {} as {[terminalId: string]: ConfigCommand};
 	sendTextsPerTerminal(stepScripts, kpEnvironment, `onLoad[${target.step}]`);
 
 	vscode.commands.executeCommand('notifications.clearAll');
