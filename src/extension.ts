@@ -10,7 +10,7 @@ import {readKatapodConfig, ConfigObject, ConfigTerminal, ConfigCommand} from './
 import {getWorkingDir} from './filesystem';
 import {log} from './logging';
 // import {sendTextToTerminal, sendTextsPerTerminal, runInitScripts} from './runCommands';
-import {sendTextToTerminal, sendTextsPerTerminal} from './runCommands';
+import {runCommand, runCommandsPerTerminal, FullCommand} from './runCommands';
 
 
 let kpEnvironment: any = {
@@ -27,7 +27,7 @@ let kpEnvironment: any = {
 
 // closing over the kpEnvironment to supply a one-arg command to registerCommand
 function sendTextClosure(cbContent: any) {
-	sendTextToTerminal(cbContent, kpEnvironment);
+	runCommand(cbContent, kpEnvironment);
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -198,7 +198,7 @@ function reloadPage(command: any) {
 	loadPage({ 'step': kpEnvironment.state.currentStep });
 }
 
-function parseCodeBlockContent(cbContent: string) {
+function parseCodeBlockContent(cbContent: string): FullCommand {
 	// filter out lines starting with "###" and make them into the target-terminal-tag directive
 	let terminalId: string = '';
 	const lines = cbContent.split('\n');
@@ -213,11 +213,11 @@ function parseCodeBlockContent(cbContent: string) {
 	if (terminalId){
 		return {
 			command: cleanContent.join('\n'),
-			runSettings: {terminalId: terminalId}
+			terminalId: terminalId,
 		};
 	}else{
 		return {
-			command: cleanContent.join('\n')
+			command: cleanContent.join('\n'),
 		};
 	}
 }
@@ -240,8 +240,6 @@ function loadPage (target: Target) {
 		if (info) { // Fallback to the default processor
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
 		}
-
-		log('debug', `TOKEN => ${JSON.stringify(tokens[idx])}`);
 
 		const parsedContent = parseCodeBlockContent(tokens[idx].content);
 		const {command} = parsedContent;
@@ -286,7 +284,7 @@ function loadPage (target: Target) {
 
 	// process step-scripts if any
 	const stepScripts = (kpEnvironment.configuration.navigation?.onLoadCommands || {})[target.step] || {} as {[terminalId: string]: ConfigCommand};
-	sendTextsPerTerminal(stepScripts, kpEnvironment, `onLoad[${target.step}]`);
+	runCommandsPerTerminal(stepScripts, kpEnvironment, `onLoad[${target.step}]`);
 
 	vscode.commands.executeCommand('notifications.clearAll');
 }
@@ -300,4 +298,3 @@ function renderCommandUri (parsedCbContent: any) {
 	const uri = encodeURIComponent(JSON.stringify([parsedCbContent])).toString();
 	return uri;
 }
-
