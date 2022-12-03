@@ -27,8 +27,8 @@ let kpEnvironment: any = {
 };
 
 // closing over the kpEnvironment to supply a one-arg command to registerCommand
-function sendTextClosure(cbContent: any) {
-	runCommand(cbContent, kpEnvironment);
+function sendTextClosure(fullCommand: FullCommand) {
+	runCommand(fullCommand, kpEnvironment);
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -198,8 +198,6 @@ function reloadPage(command: any) {
 	loadPage({ 'step': kpEnvironment.state.currentStep });
 }
 
-
-
 function loadPage (target: Target) {
 	kpEnvironment.state.currentStep = target.step;
 
@@ -219,16 +217,16 @@ function loadPage (target: Target) {
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
 		}
 
-		const parsedContent: FullCommand = parseCodeBlockContent(tokens[idx].content);
+		const parsedCommand: FullCommand = parseCodeBlockContent(tokens[idx].content);
 
-		if(parsedContent.execute !== false){
+		if(parsedCommand.execute !== false){
 			return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
-				renderCommandUri(parsedContent) + '">▶</a>' + 
-				md.utils.escapeHtml(parsedContent.command) +
+				renderCommandUri(parsedCommand) + '">▶</a>' + 
+				md.utils.escapeHtml(parsedCommand.command) +
 			'</code></pre>\n';
 		}else{
 			return  '<pre><code>' + 
-				md.utils.escapeHtml(parsedContent.command) +
+				md.utils.escapeHtml(parsedCommand.command) +
 				'</code></pre>\n';
 		}
 
@@ -273,12 +271,12 @@ function loadPage (target: Target) {
 	vscode.commands.executeCommand('notifications.clearAll');
 }
 
-function renderStepUri (step: string) {
+function renderStepUri (step: string): string {
 	const uri = encodeURIComponent(JSON.stringify([{ 'step': step }])).toString();
 	return uri;
 }
 
-function renderCommandUri (parsedCbContent: any) {
-	const uri = encodeURIComponent(JSON.stringify([parsedCbContent])).toString();
+function renderCommandUri (fullCommand: FullCommand): string {
+	const uri = encodeURIComponent(JSON.stringify([fullCommand])).toString();
 	return uri;
 }
