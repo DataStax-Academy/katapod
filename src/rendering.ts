@@ -6,7 +6,8 @@ import {FullCommand} from './runCommands';
 
 const executionInfoPrefix = "### ";
 
-// this interface must lack just "command" to be a FullCommand
+// NOTE: this interface *must* be such that it lacks just
+// the "command" field in order to be a FullCommand
 interface CodeBlockExecutionInfo {
     terminalId?: string;
     execute?: boolean;

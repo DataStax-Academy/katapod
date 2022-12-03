@@ -7,5 +7,8 @@ export function log (level: string, message: string) {
 }
 
 export function double(x: number): number {
+	/*
+	dummy function to exemplify unit tests.
+	*/
 	return 2.0 * x;
 }
