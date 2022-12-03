@@ -1,11 +1,13 @@
 import * as assert from 'assert';
 import { after } from 'mocha';
 
-import {double} from '../../logging';
+import {buildLogMessage} from '../../logging';
 
-suite('Extension Test Suite', () => {
-  test('Unit 1', () => {
-    assert.strictEqual(double(3), 6);
+suite("Extension Test Suite", () => {
+  test("Log message is built properly", () => {
+    assert.strictEqual(
+      buildLogMessage("debug", "myMessage"),
+      "KataPod [DEBUG] myMessage",
+    );
   });
-
 });

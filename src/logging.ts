@@ -2,13 +2,16 @@
 Logging facilities for the extension.
 */
 
-export function log (level: string, message: string) {
-	console.log('KataPod ' + level.toUpperCase() + ' ' + message);
+type logLevel = "debug" | "warning" | "error";
+
+
+const logTitle = 'KataPod';
+
+
+export function log(level: logLevel, message: string) {
+	console.log(buildLogMessage(level, message));
 }
 
-export function double(x: number): number {
-	/*
-	dummy function to exemplify unit tests.
-	*/
-	return 2.0 * x;
+export function buildLogMessage(level: logLevel, message: string) {
+	return `${logTitle} [${level.toUpperCase()}] ${message}`;
 }

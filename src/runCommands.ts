@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 
 import {log} from './logging';
 
+
 // Command-execution-specific structures
 export interface ConfigCommand {
 	command: string;
@@ -16,9 +17,9 @@ export interface FullCommand extends ConfigCommand {
 }
 
 
-export function runCommand (fullCommand: FullCommand, env: any) {
+export function runCommand(fullCommand: FullCommand, env: any) {
 	// i.e. only if *explicitly* false (a default of true implemented)
-	if (fullCommand.execute !== false){
+	if (fullCommand.execute !== false) {
 		// pick target terminal, with care and fallbacks
 		const targetTerminal: vscode.Terminal = (
 			fullCommand.terminalId?
@@ -34,13 +35,13 @@ export function runCommand (fullCommand: FullCommand, env: any) {
 	}
 }
 
-export function runCommandsPerTerminal (commandMap: {[terminalId: string]: ConfigCommand}, env: any, logContext: string){
+export function runCommandsPerTerminal(commandMap: {[terminalId: string]: ConfigCommand}, env: any, logContext: string) {
 	Object.entries(commandMap).forEach(([terminalId, configCommand]) => {
 		log('debug', `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
 		const fullCommand: FullCommand = {
 			...{terminalId: terminalId},
 			...configCommand,
-		}
+		};
 		runCommand(fullCommand, env);
 	});
 }
