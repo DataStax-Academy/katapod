@@ -6,11 +6,12 @@ const fs = require('fs');
 const markdownIt = require('markdown-it');
 const markdownItAttrs = require('markdown-it-attrs');
 
-import {readKatapodConfig, ConfigObject, ConfigTerminal, ConfigCommand} from './configuration';
+import {readKatapodConfig, ConfigObject, ConfigTerminal} from './configuration';
 import {getWorkingDir} from './filesystem';
 import {log} from './logging';
 // import {sendTextToTerminal, sendTextsPerTerminal, runInitScripts} from './runCommands';
-import {runCommand, runCommandsPerTerminal, FullCommand} from './runCommands';
+import {runCommand, runCommandsPerTerminal, ConfigCommand, FullCommand} from './runCommands';
+import {parseCodeBlockContent} from './rendering';
 
 
 let kpEnvironment: any = {
@@ -59,22 +60,21 @@ function start (command?: any) {
 	readKatapodConfig().then(
 		(cfg: ConfigObject) => {
 			kpEnvironment.configuration = cfg;
-			log('debug', `KP config : ${JSON.stringify(kpEnvironment.configuration)}`);
+			log('debug', `[start] KP config : ${JSON.stringify(kpEnvironment.configuration)}`);
 
 			kpEnvironment.components.panel = createPanel();
-			log('debug', `kpEnvironment.components.panel.viewType = ${kpEnvironment.components.panel.viewType}`);
 
 			setTerminalLayout(kpEnvironment.configuration).then(
 				terminalMap => {
 					kpEnvironment.components.terminalMap = terminalMap;
 					kpEnvironment.components.terminals = kpEnvironment.configuration.layout.terminals.map( (term: ConfigTerminal) => terminalMap[term.id] );
-					log('debug', 'terminals set.');
-					log('debug', `terminalMap ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
-					log('debug', `terminals ${JSON.stringify(kpEnvironment.components.terminals)}`);
+					log('debug', '[start] Terminals set.');
+					log('debug', `[start] "terminalMap" = ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
+					log('debug', `[start] "terminals" = ${JSON.stringify(kpEnvironment.components.terminals)}`);
 					// runInitScripts(kpEnvironment);
 					loadPage({ 'step': 'intro' });
 					//
-					log('debug', 'ready to rock.');
+					log('debug', '[start] Ready to rock.');
 					//
 				},
 				rejected => log('error', rejected)
@@ -87,7 +87,7 @@ function start (command?: any) {
 
 
 function createPanel () {
-	log('debug', 'Creating WebView...');
+	log('debug', '[createPanel] Creating WebView...');
 	return vscode.window.createWebviewPanel(
 		'datastax.katapod',
 		'DataStax Training Grounds',
@@ -198,29 +198,7 @@ function reloadPage(command: any) {
 	loadPage({ 'step': kpEnvironment.state.currentStep });
 }
 
-function parseCodeBlockContent(cbContent: string): FullCommand {
-	// filter out lines starting with "###" and make them into the target-terminal-tag directive
-	let terminalId: string = '';
-	const lines = cbContent.split('\n');
-	let cleanContent: string[] = [];
-	lines.forEach( (line) => {
-		if (line.slice(0,3) ==='###'){
-			terminalId = line.slice(3).trim();
-		}else{
-			cleanContent.push(line);
-		}
-	});
-	if (terminalId){
-		return {
-			command: cleanContent.join('\n'),
-			terminalId: terminalId,
-		};
-	}else{
-		return {
-			command: cleanContent.join('\n'),
-		};
-	}
-}
+
 
 function loadPage (target: Target) {
 	kpEnvironment.state.currentStep = target.step;
@@ -241,13 +219,19 @@ function loadPage (target: Target) {
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
 		}
 
-		const parsedContent = parseCodeBlockContent(tokens[idx].content);
-		const {command} = parsedContent;
+		const parsedContent: FullCommand = parseCodeBlockContent(tokens[idx].content);
 
-		return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
+		if(parsedContent.execute !== false){
+			return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
 				renderCommandUri(parsedContent) + '">▶</a>' + 
-				md.utils.escapeHtml(command) +
+				md.utils.escapeHtml(parsedContent.command) +
+			'</code></pre>\n';
+		}else{
+			return  '<pre><code>' + 
+				md.utils.escapeHtml(parsedContent.command) +
 				'</code></pre>\n';
+		}
+
 	};
 
 	// process links

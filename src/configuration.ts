@@ -8,6 +8,7 @@ const fs = require('fs');
 
 import {getWorkingDir} from './filesystem';
 import {log} from './logging';
+import {ConfigCommand} from './runCommands';
 
 const kpConfigFileName = 'NEW.katapod_config.json';
 // const kpConfigFileName = '.katapod_config.json';
@@ -20,9 +21,6 @@ const kpDefaultIntroStepName = 'intro';
 export interface ConfigTerminal {
 	id: string;
 	name: string;
-}
-export interface ConfigCommand {
-	command: string;
 }
 export interface ConfigObject {
 	layout: {
