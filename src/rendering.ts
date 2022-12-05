@@ -15,8 +15,7 @@ import {log} from './logging';
 
 const executionInfoPrefix = "### ";
 
-// NOTE: this interface *must* be such that it lacks just
-// the "command" field in order to be a FullCommand
+// this must be a FullCommand with "command" and "codeBlockId" removed!
 interface CodeBlockExecutionInfo {
     terminalId?: string;
     execute?: boolean;

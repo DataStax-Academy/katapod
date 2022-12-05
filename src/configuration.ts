@@ -92,7 +92,7 @@ export function readKatapodConfig(): Promise<ConfigObject> {
 									onLoadCommands: {
 										[kpDefaultIntroStepName]: {
 											[kpDefaultTerminalID]: {
-												'command': `./${kpDefaultStartupScript};`
+												command: `./${kpDefaultStartupScript};`,
 											}
 										}
 									}
