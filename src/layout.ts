@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 
 import {log} from './logging';
 import {ConfigObject, ConfigTerminal} from './configuration';
+import {KatapodEnvironment, TerminalMap, NoStepYet} from './state';
 
 
 function createPanel(config: ConfigObject): vscode.WebviewPanel {
@@ -27,7 +28,7 @@ function createPanel(config: ConfigObject): vscode.WebviewPanel {
 	);
 }
 
-async function setTerminalLayout(config: ConfigObject): Promise<any> {
+async function setTerminalLayout(config: ConfigObject): Promise<TerminalMap> {
 	/*
 		Create as many stacked terminals as requested.
 		NOTE: VSCode seems to support at most 8 with this setup
@@ -46,7 +47,7 @@ async function setTerminalLayout(config: ConfigObject): Promise<any> {
 	];
 	const configTerminals: Array<ConfigTerminal> = config.layout.terminals;
 	const numTerminals: number = configTerminals.length;
-	var termPromise = new Promise<any>(async function (resolve, reject) {
+	var termPromise = new Promise<TerminalMap>(async function (resolve, reject) {
 		if (numTerminals <= terminalViewColumns.length) {
 			// This is apparently not needed (it happens already in setupLayout):
 			//  await vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns');
@@ -80,20 +81,20 @@ async function setTerminalLayout(config: ConfigObject): Promise<any> {
 	return termPromise;
 }
 
-export function setupLayout(katapodConfiguration: ConfigObject): Promise<any> {
+export function setupLayout(katapodConfiguration: ConfigObject): Promise<KatapodEnvironment> {
 	/*
 	Prepare the whole Katapod layout as required by the configuration.
 	Return a Promise of an "environment" object. 
 	*/
     // return (promise of) a full just-started "katapod environment" object
     let panel: vscode.WebviewPanel = createPanel(katapodConfiguration);
-    const envPromise = new Promise<any>((resolve, reject) => {
+    const envPromise = new Promise<KatapodEnvironment>((resolve, reject) => {
 		vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns').then(
 			async function () {
 				setTerminalLayout(katapodConfiguration).then(
 					terminalMap => {
 						// build full environment
-						const environment: any = {
+						const environment: KatapodEnvironment = {
 							components: {
 								terminals: katapodConfiguration.layout.terminals.map( (term: ConfigTerminal) => terminalMap[term.id] ),
 								terminalMap: terminalMap,
@@ -101,7 +102,7 @@ export function setupLayout(katapodConfiguration: ConfigObject): Promise<any> {
 							},
 							configuration: katapodConfiguration,
 							state: {
-								currentStep: null,
+								currentStep: NoStepYet,
 							}
 						};
 						resolve(environment);

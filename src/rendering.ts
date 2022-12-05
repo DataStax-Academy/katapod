@@ -9,6 +9,7 @@ const markdownItAttrs = require('markdown-it-attrs');
 
 import {runCommandsPerTerminal, ConfigCommand, FullCommand} from './runCommands';
 import {buildFullFileUri} from './filesystem';
+import {KatapodEnvironment} from './state';
 
 const executionInfoPrefix = "### ";
 
@@ -83,11 +84,13 @@ function renderCommandUri(fullCommand: FullCommand): string {
 	return uri;
 }
 
-export function reloadPage(command: any, env: any) {
-	loadPage({'step': env.state.currentStep}, env);
+export function reloadPage(command: any, env: KatapodEnvironment) {
+	if (typeof env.state.currentStep === "string") {
+		loadPage({step: env.state.currentStep}, env);
+	}
 }
 
-export function loadPage(target: TargetStep, env: any) {
+export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	env.state.currentStep = target.step;
 
 	const file = buildFullFileUri(`${target.step}.md`);
@@ -153,7 +156,7 @@ export function loadPage(target: TargetStep, env: any) {
 
 	env.components.panel.webview.html = pre + result + post;
 
-	// process step-scripts if any
+	// process step-scripts, if present:
 	const stepScripts = (env.configuration.navigation?.onLoadCommands || {})[target.step] || {} as {[terminalId: string]: ConfigCommand};
 	runCommandsPerTerminal(stepScripts, env, `onLoad[${target.step}]`);
 

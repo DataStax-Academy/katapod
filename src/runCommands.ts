@@ -5,6 +5,7 @@ Tools to run commands and scripts on the terminals.
 import * as vscode from 'vscode';
 
 import {log} from './logging';
+import {KatapodEnvironment} from './state';
 
 
 // Command-execution-specific structures
@@ -17,7 +18,7 @@ export interface FullCommand extends ConfigCommand {
 }
 
 
-export function runCommand(fullCommand: FullCommand, env: any) {
+export function runCommand(fullCommand: FullCommand, env: KatapodEnvironment) {
 	// i.e. only if *explicitly* false (a default of true implemented)
 	if (fullCommand.execute !== false) {
 		// pick target terminal, with care and fallbacks
@@ -35,7 +36,7 @@ export function runCommand(fullCommand: FullCommand, env: any) {
 	}
 }
 
-export function runCommandsPerTerminal(commandMap: {[terminalId: string]: ConfigCommand}, env: any, logContext: string) {
+export function runCommandsPerTerminal(commandMap: {[terminalId: string]: ConfigCommand}, env: KatapodEnvironment, logContext: string) {
 	Object.entries(commandMap).forEach(([terminalId, configCommand]) => {
 		log('debug', `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
 		const fullCommand: FullCommand = {

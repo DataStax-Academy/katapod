@@ -7,28 +7,19 @@ import {log} from './logging';
 import {runCommand, FullCommand} from './runCommands';
 import {loadPage, reloadPage, TargetStep} from './rendering';
 import {setupLayout} from './layout';
+import {KatapodEnvironment} from './state';
 
-let kpEnvironment: any = {
-	components: {
-		terminals: null, // Array<vscode.Terminal>
-		terminalMap: null, // {[terminalId: string]: vscode.Terminal}
-		panel: null, // vscode.WebviewPanel
-	},
-	configuration: null, // ConfigObject
-	state: {
-		currentStep: null, // string
-	}
-};
+let katapodEnvironment: KatapodEnvironment;
 
 // closing over the kpEnvironment to supply one-arg functions to registerCommand
 function sendTextClosure(fullCommand: FullCommand) {
-	runCommand(fullCommand, kpEnvironment);
+	runCommand(fullCommand, katapodEnvironment);
 }
 function loadPageClosure(target: TargetStep) {
-	loadPage(target, kpEnvironment);
+	loadPage(target, katapodEnvironment);
 }
 function reloadPageClosure(command: any) {
-	reloadPage(command, kpEnvironment);
+	reloadPage(command, katapodEnvironment);
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -55,13 +46,13 @@ export function deactivate() {}
 
 function start(command?: any) {
 	readKatapodConfig().then(
-		(kpConfig: ConfigObject) => {
-			setupLayout(kpConfig).then(
+		(katapodConfiguration: ConfigObject) => {
+			setupLayout(katapodConfiguration).then(
 				fullEnvironment => {
-					kpEnvironment = fullEnvironment;
+					katapodEnvironment = fullEnvironment;
 					// log('debug', `Full Environment:\n${JSON.stringify(kpEnvironment, null, 2)}`);
-					log('debug', `TerminalMap = ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
-					loadPage({'step': 'intro'}, kpEnvironment);
+					log('debug', `TerminalMap = ${JSON.stringify(katapodEnvironment.components.terminalMap)}`);
+					loadPage({'step': 'intro'}, katapodEnvironment);
 				},
 				rej => log('error', `Error setting up layout ${rej}`)
 			);
