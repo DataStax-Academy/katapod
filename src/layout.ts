@@ -8,7 +8,11 @@ import {log} from './logging';
 import {ConfigObject, ConfigTerminal} from './configuration';
 
 
-function createPanel(): vscode.WebviewPanel {
+function createPanel(config: ConfigObject): vscode.WebviewPanel {
+	/*
+	Create the left-panel Webview for the rendered html
+	in the scenario. Return the panel itself (not a Promise).
+	*/
 	log('debug', '[createPanel] Creating WebViewPanel...');
 	return vscode.window.createWebviewPanel(
 		'datastax.katapod',
@@ -24,7 +28,12 @@ function createPanel(): vscode.WebviewPanel {
 }
 
 async function setTerminalLayout(config: ConfigObject): Promise<any> {
-	// return a Promise of a map string->Terminal for the created objects
+	/*
+		Create as many stacked terminals as requested.
+		NOTE: VSCode seems to support at most 8 with this setup
+		(cf. https://github.com/microsoft/vscode/blob/e19f06e48a975c9d953c2bd3199b582cb70ea5db/src/vs/workbench/api/common/extHostTypes.ts#L1739-L1751)
+		Return a Promise of a map string->Terminal for the created objects
+	*/
 	const terminalViewColumns = [
 		vscode.ViewColumn.Two,
 		vscode.ViewColumn.Three,
@@ -37,62 +46,60 @@ async function setTerminalLayout(config: ConfigObject): Promise<any> {
 	];
 	const configTerminals: Array<ConfigTerminal> = config.layout.terminals;
 	const numTerminals: number = configTerminals.length;
-	var terminalsP = new Promise<any>(async function (resolve, reject) {
+	var termPromise = new Promise<any>(async function (resolve, reject) {
 		if (numTerminals <= terminalViewColumns.length) {
-			// vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns').then(
-			// 	async function () {
-					let terminalMap: {[id: string]: vscode.Terminal} = {};
-					for(let i: number = 0; i < numTerminals; i++){
-						// https://github.com/microsoft/vscode/issues/107873 LOL
-						await vscode.commands.executeCommand('workbench.action.focusRightGroupWithoutWrap');
-						if (i < numTerminals - 1){
-							await vscode.commands.executeCommand('workbench.action.splitEditorDown');
-						}
-						const termPosition = terminalViewColumns[i];
-						const configTerminal = configTerminals[i];
-						log('debug', `[setTerminalLayout] Creating ${configTerminal.id}/"${configTerminal.name}" (${i+1}/${numTerminals})`);
-						const locationOptions: vscode.TerminalEditorLocationOptions = {
-							viewColumn: termPosition,
-						};
-						const terminalId: string = configTerminal.id;
-						const terminalName: string = configTerminal.name || terminalId;
-						const terminalOptions: vscode.TerminalOptions = {
-							name: terminalName,
-							location: locationOptions
-						};
-						terminalMap[configTerminal.id] = vscode.window.createTerminal(terminalOptions);
-					}
-
-					// await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-
-
-					resolve(terminalMap);
-			// 	}
-			// );
+			// This is apparently not needed (it happens already in setupLayout):
+			//  await vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns');
+			let terminalMap: {[id: string]: vscode.Terminal} = {};
+			for(let i: number = 0; i < numTerminals; i++){
+				// Undocumented no-wrap way to shift focus to the next group:
+				// (found a reference here, https://github.com/microsoft/vscode/issues/107873 , lol)
+				await vscode.commands.executeCommand('workbench.action.focusRightGroupWithoutWrap');
+				if (i < numTerminals - 1){
+					await vscode.commands.executeCommand('workbench.action.splitEditorDown');
+				}
+				const termPosition = terminalViewColumns[i];
+				const configTerminal = configTerminals[i];
+				log('debug', `[setTerminalLayout] Creating terminal ${configTerminal.id}/"${configTerminal.name}" (${i+1}/${numTerminals})`);
+				const locationOptions: vscode.TerminalEditorLocationOptions = {
+					viewColumn: termPosition,
+				};
+				const terminalId: string = configTerminal.id;
+				const terminalName: string = configTerminal.name || terminalId;
+				const terminalOptions: vscode.TerminalOptions = {
+					name: terminalName,
+					location: locationOptions
+				};
+				terminalMap[configTerminal.id] = vscode.window.createTerminal(terminalOptions);
+			}
+			resolve(terminalMap);
 		} else {
 			reject(new Error('Too many terminals.'));
 		}
 	});
-	//
-	return terminalsP;
+	return termPromise;
 }
 
-export function setupLayout(kpConfig: ConfigObject): Promise<any> {
+export function setupLayout(katapodConfiguration: ConfigObject): Promise<any> {
+	/*
+	Prepare the whole Katapod layout as required by the configuration.
+	Return a Promise of an "environment" object. 
+	*/
     // return (promise of) a full just-started "katapod environment" object
-    let panel: vscode.WebviewPanel = createPanel();
+    let panel: vscode.WebviewPanel = createPanel(katapodConfiguration);
     const envPromise = new Promise<any>((resolve, reject) => {
 		vscode.commands.executeCommand('workbench.action.editorLayoutTwoColumns').then(
 			async function () {
-				setTerminalLayout(kpConfig).then(
+				setTerminalLayout(katapodConfiguration).then(
 					terminalMap => {
 						// build full environment
 						const environment: any = {
 							components: {
-								terminals: kpConfig.layout.terminals.map( (term: ConfigTerminal) => terminalMap[term.id] ),
+								terminals: katapodConfiguration.layout.terminals.map( (term: ConfigTerminal) => terminalMap[term.id] ),
 								terminalMap: terminalMap,
 								panel: panel,
 							},
-							configuration: kpConfig,
+							configuration: katapodConfiguration,
 							state: {
 								currentStep: null,
 							}

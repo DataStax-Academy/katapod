@@ -57,7 +57,7 @@ export function readKatapodConfig(): Promise<ConfigObject> {
 	- If the config file is found, it is:
 		loaded,
 		validated
-		and returned scrupolously.
+		and returned scrupolously (i.e. no educated guessed even, such as check for legacy "wait.sh").
 	- If it's not found, a fallback to backward compatibility is done, with
 		a default config (one-terminal, legacy naming etc)
 		and further settings depending on educated guessed from the scenario content (such as whether "wait.sh" exists, etc)
