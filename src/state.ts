@@ -20,6 +20,6 @@ export interface KatapodEnvironment {
 	configuration: ConfigObject;
 	state: {
 		stepHistory: Array<string | typeof NO_STEP_YET>;
-        executedCode: {[codeBlockId: string]: number};
+        codeInvocationCount: {[codeBlockId: string]: number};
 	}
 }

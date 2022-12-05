@@ -104,7 +104,7 @@ export function setupLayout(katapodConfiguration: ConfigObject): Promise<Katapod
 							configuration: katapodConfiguration,
 							state: {
 								stepHistory: [NO_STEP_YET],
-								executedCode: {},
+								codeInvocationCount: {},
 							}
 						};
 						resolve(environment);

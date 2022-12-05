@@ -14,11 +14,13 @@ import {log} from './logging';
 
 
 const executionInfoPrefix = "### ";
+const defaultCodeBlockMaxInvocations = "unlimited";
 
 // this must be a FullCommand with "command" and "codeBlockId" removed!
 interface CodeBlockExecutionInfo {
     terminalId?: string;
     execute?: boolean;
+	maxInvocations: number | "unlimited";
 }
 
 export interface TargetStep {
@@ -62,10 +64,16 @@ function parseCodeBlockContent(step: string, index: number, cbContent: string): 
         // this might be just-a-terminal-Id, a fully-formed JSON
         let executionInfo: CodeBlockExecutionInfo;
         try{
-            executionInfo = JSON.parse(infoLine) as CodeBlockExecutionInfo;
+            executionInfo = {
+				...{maxInvocations: defaultCodeBlockMaxInvocations},
+				...JSON.parse(infoLine),
+			 } as CodeBlockExecutionInfo;
         }catch(e) {
             // we take the line to be a naked terminalId
-            executionInfo = {terminalId: infoLine};
+            executionInfo = {
+				terminalId: infoLine,
+				maxInvocations: defaultCodeBlockMaxInvocations,
+			};
         }
         return {
 			...contextData,
@@ -76,6 +84,7 @@ function parseCodeBlockContent(step: string, index: number, cbContent: string): 
         return {
 			...contextData,
 			...{
+				maxInvocations: defaultCodeBlockMaxInvocations,
             	command: bareCommand,
 			},
         };
