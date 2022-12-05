@@ -7,7 +7,7 @@ const fs = require('fs');
 const markdownIt = require('markdown-it');
 const markdownItAttrs = require('markdown-it-attrs');
 
-import {runCommandsPerTerminal, ConfigCommand, FullCommand} from './runCommands';
+import {runCommandsPerTerminal, ConfigCommand, FullCommand, cbIdSeparator} from './runCommands';
 import {buildFullFileUri} from './filesystem';
 import {KatapodEnvironment} from './state';
 import {log} from './logging';
@@ -27,7 +27,7 @@ export interface TargetStep {
 }
 
 
-function parseCodeBlockContent(cbContent: string): FullCommand {
+function parseCodeBlockContent(step: string, index: number, cbContent: string): FullCommand {
     /*
     Parse a code-block "raw string", such as
         ### {"terminalId": "myTermId"}
@@ -55,6 +55,9 @@ function parseCodeBlockContent(cbContent: string): FullCommand {
 	});
     //
     const bareCommand: string = actualLines.join('\n');
+	const contextData = {
+		codeBlockId: `inPage${cbIdSeparator}${step}${cbIdSeparator}${index}`,
+	};
     //
     if (infoLine) {
         // this might be just-a-terminal-Id, a fully-formed JSON
@@ -66,12 +69,16 @@ function parseCodeBlockContent(cbContent: string): FullCommand {
             executionInfo = {terminalId: infoLine};
         }
         return {
+			...contextData,
             ...executionInfo,
             ...{command: bareCommand},
         };
     }else{
         return {
-            command: bareCommand,
+			...contextData,
+			...{
+            	command: bareCommand,
+			},
         };
     }
 }
@@ -103,6 +110,8 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 		.use(require('markdown-it-textual-uml'))
 		.use(markdownItAttrs);
 
+	let blockIndex = 0;
+
 	// process codeblocks
 	md.renderer.rules.fence_default = md.renderer.rules.fence;
 	md.renderer.rules.fence = function (tokens: any, idx: any, options: any, env: any, slf: any) {
@@ -113,7 +122,8 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
 		}
 
-		const parsedCommand: FullCommand = parseCodeBlockContent(tokens[idx].content);
+		const parsedCommand: FullCommand = parseCodeBlockContent(target.step, blockIndex, tokens[idx].content);
+		blockIndex++;
 
 		if(parsedCommand.execute !== false) {
 			return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
@@ -162,7 +172,7 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 
 	// process step-scripts, if present:
 	const stepScripts = (env.configuration.navigation?.onLoadCommands || {})[target.step] || {} as {[terminalId: string]: ConfigCommand};
-	runCommandsPerTerminal(stepScripts, env, `onLoad[${target.step}]`);
+	runCommandsPerTerminal(target.step, stepScripts, env, `onLoad[${target.step}]`);
 
 	vscode.commands.executeCommand('notifications.clearAll');
 }

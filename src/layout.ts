@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 
 import {log} from './logging';
 import {ConfigObject, ConfigTerminal} from './configuration';
-import {KatapodEnvironment, TerminalMap, NoStepYet} from './state';
+import {KatapodEnvironment, TerminalMap, NO_STEP_YET} from './state';
 
 
 function createPanel(config: ConfigObject): vscode.WebviewPanel {
@@ -57,16 +57,17 @@ async function setTerminalLayout(config: ConfigObject): Promise<TerminalMap> {
 				// (found a reference here, https://github.com/microsoft/vscode/issues/107873 , lol)
 				await vscode.commands.executeCommand('workbench.action.focusRightGroupWithoutWrap');
 				if (i < numTerminals - 1){
+					// when creating the last terminal, no need to further split the stack and make room for the next.
 					await vscode.commands.executeCommand('workbench.action.splitEditorDown');
 				}
 				const termPosition = terminalViewColumns[i];
 				const configTerminal = configTerminals[i];
-				log('debug', `[setTerminalLayout] Creating terminal ${configTerminal.id}/"${configTerminal.name}" (${i+1}/${numTerminals})`);
+				const terminalId: string = configTerminal.id;
+				const terminalName: string = configTerminal.name || terminalId;
+				log('debug', `[setTerminalLayout] Creating terminal ${configTerminal.id}/"${terminalName}" (${i+1}/${numTerminals})`);
 				const locationOptions: vscode.TerminalEditorLocationOptions = {
 					viewColumn: termPosition,
 				};
-				const terminalId: string = configTerminal.id;
-				const terminalName: string = configTerminal.name || terminalId;
 				const terminalOptions: vscode.TerminalOptions = {
 					name: terminalName,
 					location: locationOptions
@@ -102,7 +103,8 @@ export function setupLayout(katapodConfiguration: ConfigObject): Promise<Katapod
 							},
 							configuration: katapodConfiguration,
 							state: {
-								stepHistory: [NoStepYet],
+								stepHistory: [NO_STEP_YET],
+								executedCode: {},
 							}
 						};
 						resolve(environment);

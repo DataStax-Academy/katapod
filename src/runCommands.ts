@@ -8,6 +8,9 @@ import {log} from './logging';
 import {KatapodEnvironment} from './state';
 
 
+export const cbIdSeparator = "_";
+
+
 // Command-execution-specific structures
 export interface ConfigCommand {
 	command: string;
@@ -15,6 +18,7 @@ export interface ConfigCommand {
 }
 export interface FullCommand extends ConfigCommand {
 	terminalId?: string;
+	codeBlockId: string;
 }
 
 
@@ -36,11 +40,14 @@ export function runCommand(fullCommand: FullCommand, env: KatapodEnvironment) {
 	}
 }
 
-export function runCommandsPerTerminal(commandMap: {[terminalId: string]: ConfigCommand}, env: KatapodEnvironment, logContext: string) {
+export function runCommandsPerTerminal(step: string, commandMap: {[terminalId: string]: ConfigCommand}, env: KatapodEnvironment, logContext: string) {
 	Object.entries(commandMap).forEach(([terminalId, configCommand]) => {
 		log('debug', `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
 		const fullCommand: FullCommand = {
-			...{terminalId: terminalId},
+			...{
+				terminalId: terminalId,
+				codeBlockId: `onLoad${cbIdSeparator}${step}${cbIdSeparator}${terminalId}`,
+			},
 			...configCommand,
 		};
 		runCommand(fullCommand, env);
