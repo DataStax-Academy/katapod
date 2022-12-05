@@ -25,7 +25,7 @@ export function runCommand(fullCommand: FullCommand, env: any) {
 			fullCommand.terminalId?
 			env.components.terminalMap[fullCommand.terminalId]:
 			env.components.terminals[0]
-		);
+		) || env.components.terminals[0];
 		// run the command
 		log('debug', `[runCommand]: Running ${JSON.stringify(fullCommand)}`);
 		targetTerminal.sendText(fullCommand.command);

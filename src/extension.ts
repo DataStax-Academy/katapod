@@ -59,7 +59,8 @@ function start(command?: any) {
 			setupLayout(kpConfig).then(
 				fullEnvironment => {
 					kpEnvironment = fullEnvironment;
-					log('debug', `Full Environment:\n${JSON.stringify(kpEnvironment, null, 2)}`);
+					// log('debug', `Full Environment:\n${JSON.stringify(kpEnvironment, null, 2)}`);
+					log('debug', `TerminalMap = ${JSON.stringify(kpEnvironment.components.terminalMap)}`);
 					loadPage({'step': 'intro'}, kpEnvironment);
 				},
 				rej => log('error', `Error setting up layout ${rej}`)
