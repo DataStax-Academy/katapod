@@ -102,7 +102,7 @@ export function setupLayout(katapodConfiguration: ConfigObject): Promise<Katapod
 							},
 							configuration: katapodConfiguration,
 							state: {
-								currentStep: NoStepYet,
+								stepHistory: [NoStepYet],
 							}
 						};
 						resolve(environment);

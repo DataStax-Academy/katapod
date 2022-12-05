@@ -10,6 +10,8 @@ const markdownItAttrs = require('markdown-it-attrs');
 import {runCommandsPerTerminal, ConfigCommand, FullCommand} from './runCommands';
 import {buildFullFileUri} from './filesystem';
 import {KatapodEnvironment} from './state';
+import {log} from './logging';
+
 
 const executionInfoPrefix = "### ";
 
@@ -85,13 +87,15 @@ function renderCommandUri(fullCommand: FullCommand): string {
 }
 
 export function reloadPage(command: any, env: KatapodEnvironment) {
-	if (typeof env.state.currentStep === "string") {
-		loadPage({step: env.state.currentStep}, env);
+	const currentStep = env.state.stepHistory.slice(-1)[0];
+	if (typeof currentStep === "string") {
+		loadPage({step: currentStep}, env);
 	}
 }
 
 export function loadPage(target: TargetStep, env: KatapodEnvironment) {
-	env.state.currentStep = target.step;
+	env.state.stepHistory.push(target.step);
+	log('debug', `[loadPage] Step history: ${env.state.stepHistory.map(s => s.toString()).join(" => ")}`);
 
 	const file = buildFullFileUri(`${target.step}.md`);
 

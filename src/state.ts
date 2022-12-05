@@ -9,6 +9,8 @@ import {ConfigObject} from './configuration';
 
 export type TerminalMap = {[terminalId: string]: vscode.Terminal};
 
+export const NoStepYet = Symbol("uninitialized");
+
 export interface KatapodEnvironment {
     components: {
 		terminals: Array<vscode.Terminal>;
@@ -17,8 +19,6 @@ export interface KatapodEnvironment {
     },
 	configuration: ConfigObject;
 	state: {
-		currentStep: string | typeof NoStepYet;
+		stepHistory: Array<string | typeof NoStepYet>;
 	}
 }
-
-export const NoStepYet = Symbol("uninitialized");
