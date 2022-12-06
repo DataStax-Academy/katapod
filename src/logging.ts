@@ -5,7 +5,7 @@ Logging facilities for the extension.
 type LogLevel = "debug" | "warning" | "error";
 
 
-const logTitle = 'KataPod';
+const logTitle = "KataPod";
 
 
 export function log(level: LogLevel, message: string) {

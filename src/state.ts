@@ -2,9 +2,9 @@
 Handling and definitions pertaining to "state" of the scenario during its lifetime.
 */
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {ConfigObject} from './configuration';
+import {ConfigObject} from "./configuration";
 
 
 export type TerminalMap = {[terminalId: string]: vscode.Terminal};

@@ -2,8 +2,8 @@
 Filesystem and I/O facilities.
 */
 
-import * as vscode from 'vscode';
-const path = require('path');
+import * as vscode from "vscode";
+const path = require("path");
 
 
 export function getWorkingDir(): string | undefined {

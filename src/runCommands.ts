@@ -2,10 +2,10 @@
 Tools to run commands and scripts on the terminals.
 */
 
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import {log} from './logging';
-import {KatapodEnvironment} from './state';
+import {log} from "./logging";
+import {KatapodEnvironment} from "./state";
 
 
 export const cbIdSeparator = "_";
@@ -40,23 +40,23 @@ export function runCommand(fullCommand: FullCommand, env: KatapodEnvironment) {
 		const invocationCountSoFar = env.state.codeInvocationCount[fullCommand.codeBlockId] || 0;
 		if ( (fullCommand.maxInvocations === "unlimited") || (invocationCountSoFar < fullCommand.maxInvocations)){
 			// run the command
-			log('debug', `[runCommand]: Running ${JSON.stringify(fullCommand)} (invocations until now: ${invocationCountSoFar})`);
+			log("debug", `[runCommand]: Running ${JSON.stringify(fullCommand)} (invocations until now: ${invocationCountSoFar})`);
 			// increment the execution counter for this command:
 			env.state.codeInvocationCount[fullCommand.codeBlockId] = (env.state.codeInvocationCount[fullCommand.codeBlockId] || 0) +1;
 			// actually launch the command:
 			targetTerminal.sendText(fullCommand.command);
-			vscode.commands.executeCommand('notifications.clearAll');
+			vscode.commands.executeCommand("notifications.clearAll");
 		} else {
-			log('debug', `[runCommand]: Refusing to execute ${JSON.stringify(fullCommand)} (invocations detected: ${invocationCountSoFar})`);
+			log("debug", `[runCommand]: Refusing to execute ${JSON.stringify(fullCommand)} (invocations detected: ${invocationCountSoFar})`);
 		}
 	} else {
-		log('debug', `[runCommand]: Refusing to execute ${JSON.stringify(fullCommand)} ('execute' flag set to false)`);
+		log("debug", `[runCommand]: Refusing to execute ${JSON.stringify(fullCommand)} ("execute" flag set to false)`);
 	}
 }
 
 export function runCommandsPerTerminal(step: string, commandMap: {[terminalId: string]: ConfigCommand}, env: KatapodEnvironment, logContext: string) {
 	Object.entries(commandMap).forEach(([terminalId, configCommand]) => {
-		log('debug', `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
+		log("debug", `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
 		const fullCommand: FullCommand = {
 			...{
 				terminalId: terminalId,

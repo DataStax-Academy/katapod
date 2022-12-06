@@ -2,19 +2,50 @@
 Parsing/rendering markdown, code blocks and other elements.
 */
 
-import * as vscode from 'vscode';
-const fs = require('fs');
-const markdownIt = require('markdown-it');
-const markdownItAttrs = require('markdown-it-attrs');
+import * as vscode from "vscode";
+const fs = require("fs");
+const markdownIt = require("markdown-it");
+const markdownItAttrs = require("markdown-it-attrs");
 
-import {runCommandsPerTerminal, ConfigCommand, FullCommand, cbIdSeparator} from './runCommands';
-import {buildFullFileUri} from './filesystem';
-import {KatapodEnvironment} from './state';
-import {log} from './logging';
+import {runCommandsPerTerminal, ConfigCommand, FullCommand, cbIdSeparator} from "./runCommands";
+import {buildFullFileUri} from "./filesystem";
+import {KatapodEnvironment} from "./state";
+import {log} from "./logging";
 
 
 const executionInfoPrefix = "### ";
 const defaultCodeBlockMaxInvocations = "unlimited";
+const stepPageHtmlPrefix = `
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/css/katapod.css" />
+		<script src="https://datastax-academy.github.io/katapod-shared-assets/js/katapod.js"></script>
+		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/quiz/quiz.css" />
+		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/quiz/page.css" />
+		<script src="https://datastax-academy.github.io/katapod-shared-assets/quiz/quiz.js"></script>
+		<script src="https://datastax-academy.github.io/katapod-shared-assets/quiz/main.js"></script>
+	</head>
+	<body>
+`;
+	const stepPageHtmlPostfix = `
+		<script>
+			// adapted from: https://code.visualstudio.com/api/extension-guides/webview#scripts-and-message-passing
+			window.addEventListener("message", event => {
+				const message = event.data;
+				switch(message.command){
+					case "scroll_to_top":
+						window.scrollTo(0, 0);
+						break;
+				}
+			});
+		</script>
+	</body>
+</html>
+`;
+
 
 // this must be a FullCommand with "command" and "codeBlockId" removed!
 interface CodeBlockExecutionInfo {
@@ -45,7 +76,7 @@ function parseCodeBlockContent(step: string, index: number, cbContent: string): 
     */
     let actualLines: Array<string> = [];
     let infoLine: string | undefined = undefined;
-    const rawLines = cbContent.split('\n');
+    const rawLines = cbContent.split("\n");
     //
 	rawLines.forEach( (line) => {
 		if (line.slice(0,4) === executionInfoPrefix) {
@@ -55,7 +86,7 @@ function parseCodeBlockContent(step: string, index: number, cbContent: string): 
 		}
 	});
     //
-    const bareCommand: string = actualLines.join('\n');
+    const bareCommand: string = actualLines.join("\n");
 	const contextData = {
 		codeBlockId: `inPage${cbIdSeparator}${step}${cbIdSeparator}${index}`,
 	};
@@ -92,7 +123,7 @@ function parseCodeBlockContent(step: string, index: number, cbContent: string): 
 }
 
 function renderStepUri(step: string): string {
-	const uri = encodeURIComponent(JSON.stringify([{ 'step': step }])).toString();
+	const uri = encodeURIComponent(JSON.stringify([{step: step}])).toString();
 	return uri;
 }
 
@@ -110,12 +141,12 @@ export function reloadPage(command: any, env: KatapodEnvironment) {
 
 export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	env.state.stepHistory.push(target.step);
-	log('debug', `[loadPage] Step history: ${env.state.stepHistory.map(s => s.toString()).join(" => ")}`);
+	log("debug", `[loadPage] Step history: ${env.state.stepHistory.map(s => s.toString()).join(" => ")}`);
 
 	const file = buildFullFileUri(`${target.step}.md`);
 
 	const md = new markdownIt({html: true})
-		.use(require('markdown-it-textual-uml'))
+		.use(require("markdown-it-textual-uml"))
 		.use(markdownItAttrs);
 
 	let blockIndex = 0;
@@ -124,7 +155,7 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	md.renderer.rules.fence_default = md.renderer.rules.fence;
 	md.renderer.rules.fence = function (tokens: any, idx: any, options: any, env: any, slf: any) {
 		var token = tokens[idx],
-			info = token.info ? md.utils.unescapeAll(token.info).trim() : '';
+			info = token.info ? md.utils.unescapeAll(token.info).trim() : "";
 
 		if (info) { // Fallback to the default processor
 			return md.renderer.rules.fence_default(tokens, idx, options, env, slf);
@@ -134,14 +165,14 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 		blockIndex++;
 
 		if(parsedCommand.execute !== false) {
-			return  '<pre' + slf.renderAttrs(token) + ' title="Click <play button> to execute!"><code>' + '<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?' + 
-				renderCommandUri(parsedCommand) + '">▶</a>' + 
+			return  `<pre` + slf.renderAttrs(token) + ` title="Click <play button> to execute!"><code>` + `<a class="command_link" title="Click to execute!" class="button1" href="command:katapod.sendText?` + 
+				renderCommandUri(parsedCommand) + `">▶</a>` + 
 				md.utils.escapeHtml(parsedCommand.command) +
-			'</code></pre>\n';
+			"</code></pre>\n";
 		}else{
-			return  '<pre><code>' + 
+			return  "<pre><code>" + 
 				md.utils.escapeHtml(parsedCommand.command) +
-				'</code></pre>\n';
+				"</code></pre>\n";
 		}
 
 	};
@@ -149,38 +180,26 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	// process links
 	let linkOpenDefault = md.renderer.rules.link_open || function(tokens: any, idx: any, options: any, env: any, self: any) { return self.renderToken(tokens, idx, options); };
 	md.renderer.rules.link_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
-		var href = tokens[idx].attrIndex('href');
+		var href = tokens[idx].attrIndex("href");
 	  
 		let url = tokens[idx].attrs[href][1];
-		if (url.includes('command:katapod.loadPage?')) {
-			let uri = url.replace('command:katapod.loadPage?', '');
-			tokens[idx].attrs[href][1] = 'command:katapod.loadPage?' + renderStepUri(uri);
+		if (url.includes("command:katapod.loadPage?")) {
+			let uri = url.replace("command:katapod.loadPage?", "");
+			tokens[idx].attrs[href][1] = "command:katapod.loadPage?" + renderStepUri(uri);
 		}
 	  
 		return linkOpenDefault(tokens, idx, options, env, self);
 	};
 
-	const pre = `<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/css/katapod.css" />
-		<script src="https://datastax-academy.github.io/katapod-shared-assets/js/katapod.js"></script>
-		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/quiz/quiz.css" />
-		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/quiz/page.css" />
-		<script src="https://datastax-academy.github.io/katapod-shared-assets/quiz/quiz.js"></script>
-		<script src="https://datastax-academy.github.io/katapod-shared-assets/quiz/main.js"></script>
-	</head>
-	<body>`;
-	const post = `</body></html>`;
-	var result = md.render((fs.readFileSync(file.fsPath, 'utf8')));
+	var result = md.render((fs.readFileSync(file.fsPath, "utf8")));
 
-	env.components.panel.webview.html = pre + result + post;
+	env.components.panel.webview.html = stepPageHtmlPrefix + result + stepPageHtmlPostfix;
 
 	// process step-scripts, if present:
 	const stepScripts = (env.configuration.navigation?.onLoadCommands || {})[target.step] || {} as {[terminalId: string]: ConfigCommand};
 	runCommandsPerTerminal(target.step, stepScripts, env, `onLoad[${target.step}]`);
 
-	vscode.commands.executeCommand('notifications.clearAll');
+	vscode.commands.executeCommand("notifications.clearAll").then( () => {
+		env.components.panel.webview.postMessage({command: "scroll_to_top"});
+	});
 }
