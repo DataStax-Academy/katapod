@@ -9,7 +9,7 @@ import {log} from './logging';
 import {ConfigCommand} from './runCommands';
 
 
-const kpConfigFileName = 'NEW.katapod_config.json';
+const kpConfigFileName = '.katapod_config.json';
 // const kpConfigFileName = '.katapod_config.json';
 const kpDefaultStartupScript = 'wait.sh';
 const kpDefaultTerminalName = 'cqlsh-editor';
