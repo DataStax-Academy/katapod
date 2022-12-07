@@ -2,7 +2,9 @@
 Tools to run commands and scripts on the terminals.
 */
 
+import { TIMEOUT } from "dns";
 import * as vscode from "vscode";
+import { moveMessagePortToContext } from "worker_threads";
 
 import {log} from "./logging";
 import {KatapodEnvironment} from "./state";
@@ -10,12 +12,14 @@ import {KatapodEnvironment} from "./state";
 
 export const cbIdSeparator = "_";
 
+type Macro = "ctrl_c" | "no_op";
 
 // Command-execution-specific structures
 export interface ConfigCommand {
 	command: string;
 	execute?: boolean;
 	maxInvocations?: number | "unlimited";
+	macrosBefore?: Array<Macro>;
 }
 // the above would become the following, with defaults and added stuff
 export interface FullCommand {
@@ -24,6 +28,7 @@ export interface FullCommand {
 	terminalId?: string;
 	codeBlockId: string;
 	maxInvocations: number | "unlimited";
+	macrosBefore?: Array<Macro>;
 }
 
 
@@ -39,6 +44,18 @@ export function runCommand(fullCommand: FullCommand, env: KatapodEnvironment) {
 		// do we run the command?
 		const invocationCountSoFar = env.state.codeInvocationCount[fullCommand.codeBlockId] || 0;
 		if ( (fullCommand.maxInvocations === "unlimited") || (invocationCountSoFar < fullCommand.maxInvocations)){
+			const macrosBefore: Array<Macro> = fullCommand.macrosBefore || [];
+			if (macrosBefore) {
+				for(let macro of macrosBefore){
+					log("debug", `[runCommand]: Running macro "${macro.toString()}"`);
+					if(macro == "ctrl_c"){
+						// and "end-of-text" character, cf. https://github.com/microsoft/vscode/blob/f9928a18462204b6725f141bc9af2303cabd2e82/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts#L836
+						targetTerminal.sendText("\x03", false);
+					}else if(macro == "no_op"){
+						// do nothing
+					}
+				}
+			}
 			// run the command
 			log("debug", `[runCommand]: Running ${JSON.stringify(fullCommand)} (invocations until now: ${invocationCountSoFar})`);
 			// increment the execution counter for this command:
