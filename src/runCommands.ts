@@ -48,10 +48,10 @@ export function runCommand(fullCommand: FullCommand, env: KatapodEnvironment) {
 			if (macrosBefore) {
 				for(let macro of macrosBefore){
 					log("debug", `[runCommand]: Running macro "${macro.toString()}"`);
-					if(macro == "ctrl_c"){
+					if(macro === "ctrl_c"){
 						// and "end-of-text" character, cf. https://github.com/microsoft/vscode/blob/f9928a18462204b6725f141bc9af2303cabd2e82/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts#L836
 						targetTerminal.sendText("\x03", false);
-					}else if(macro == "no_op"){
+					}else if(macro === "no_op"){
 						// do nothing
 					}
 				}
@@ -71,17 +71,19 @@ export function runCommand(fullCommand: FullCommand, env: KatapodEnvironment) {
 	}
 }
 
-export function runCommandsPerTerminal(step: string, commandMap: {[terminalId: string]: ConfigCommand}, env: KatapodEnvironment, logContext: string) {
-	Object.entries(commandMap).forEach(([terminalId, configCommand]) => {
-		log("debug", `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
-		const fullCommand: FullCommand = {
-			...{
-				terminalId: terminalId,
-				codeBlockId: `onLoad${cbIdSeparator}${step}${cbIdSeparator}${terminalId}`,
-				maxInvocations: 1,
-			},
-			...configCommand,
-		};
-		runCommand(fullCommand, env);
+export function runCommandsPerTerminal(step: string, commandMap: {[terminalId: string]: Array<ConfigCommand>}, env: KatapodEnvironment, logContext: string) {
+	Object.entries(commandMap).forEach(([terminalId, configCommands]) => {
+		configCommands.forEach(configCommand => {
+			log("debug", `[runCommandsPerTerminal/${logContext}]: running map entry ${terminalId} => ${JSON.stringify(configCommand)}`);
+			const fullCommand: FullCommand = {
+				...{
+					terminalId: terminalId,
+					codeBlockId: `onLoad${cbIdSeparator}${step}${cbIdSeparator}${terminalId}`,
+					maxInvocations: 1,
+				},
+				...configCommand,
+			};
+			runCommand(fullCommand, env);
+		});
 	});
 }

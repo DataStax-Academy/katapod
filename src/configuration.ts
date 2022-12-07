@@ -29,7 +29,7 @@ export interface ConfigObject {
 	navigation: {
 		onLoadCommands: {
 			[step: string]: {
-				[terminalId: string]: ConfigCommand;
+				[terminalId: string]: Array<ConfigCommand>;
 			}
 		}
 	}
@@ -91,9 +91,11 @@ export function readKatapodConfig(): Promise<ConfigObject> {
 								navigation: {
 									onLoadCommands: {
 										[kpDefaultIntroStepName]: {
-											[kpDefaultTerminalID]: {
-												command: `./${kpDefaultStartupScript};`,
-											}
+											[kpDefaultTerminalID]: [
+												{
+												  	command: `./${kpDefaultStartupScript};`,
+												}
+											]
 										}
 									}
 								}

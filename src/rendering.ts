@@ -196,7 +196,7 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	env.components.panel.webview.html = stepPageHtmlPrefix + result + stepPageHtmlPostfix;
 
 	// process step-scripts, if present:
-	const stepScripts = (env.configuration.navigation?.onLoadCommands || {})[target.step] || {} as {[terminalId: string]: ConfigCommand};
+	const stepScripts = (env.configuration.navigation?.onLoadCommands || {})[target.step] || {};
 	runCommandsPerTerminal(target.step, stepScripts, env, `onLoad[${target.step}]`);
 
 	vscode.commands.executeCommand("notifications.clearAll").then( () => {
