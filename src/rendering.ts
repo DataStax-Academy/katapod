@@ -3,6 +3,7 @@ Parsing/rendering markdown, code blocks and other elements.
 */
 
 import * as vscode from "vscode";
+import * as path from "path";
 const fs = require("fs");
 const markdownIt = require("markdown-it");
 const markdownItAttrs = require("markdown-it-attrs");
@@ -30,7 +31,7 @@ const stepPageHtmlPrefix = `
 	</head>
 	<body>
 `;
-	const stepPageHtmlPostfix = `
+const stepPageHtmlPostfix = `
 		<script>
 			// adapted from: https://code.visualstudio.com/api/extension-guides/webview#scripts-and-message-passing
 			window.addEventListener("message", event => {
@@ -45,7 +46,7 @@ const stepPageHtmlPrefix = `
 	</body>
 </html>
 `;
-
+const fullRemoteUriSnippet = '://';
 
 // this must be a FullCommand with "command" and "codeBlockId" removed!
 interface CodeBlockExecutionInfo {
@@ -139,6 +140,14 @@ export function reloadPage(command: any, env: KatapodEnvironment) {
 	}
 }
 
+export function isLocalImageSrc(imgSrc: string): boolean {
+	/*
+	Determine if the "src" attribute of an image embedded in the markdown
+	is a reference to a file local in the scenario repo. 
+	*/
+	return imgSrc.indexOf(fullRemoteUriSnippet) < 0;
+}
+
 export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	env.state.stepHistory.push(target.step);
 	log("debug", `[loadPage] Step history: ${env.state.stepHistory.map(s => s.toString()).join(" => ")}`);
@@ -181,7 +190,6 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	let linkOpenDefault = md.renderer.rules.link_open || function(tokens: any, idx: any, options: any, env: any, self: any) { return self.renderToken(tokens, idx, options); };
 	md.renderer.rules.link_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
 		var href = tokens[idx].attrIndex("href");
-	  
 		let url = tokens[idx].attrs[href][1];
 		if (url.includes("command:katapod.loadPage?")) {
 			let uri = url.replace("command:katapod.loadPage?", "");
@@ -190,6 +198,22 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 	  
 		return linkOpenDefault(tokens, idx, options, env, self);
 	};
+
+	// process images
+	const _webview = env.components.panel.webview;
+	let imageDefault = md.renderer.rules.image || function(tokens: any, idx: any, options: any, env: any, self: any) { return self.renderToken(tokens, idx, options); };
+	md.renderer.rules.image = function(tokens: any, idx: any, options: any, env: any, self: any) {
+		var srcIndex = tokens[idx].attrIndex("src");
+		var srcValue = tokens[idx].attrs[srcIndex][1];
+		if (isLocalImageSrc(srcValue)){
+			// replace the (relative) path to the image file to the VSCode special URI
+			// as described here: https://code.visualstudio.com/api/extension-guides/webview#loading-local-content
+			const imgUri = buildFullFileUri(srcValue);
+			const imgPanelUri = _webview.asWebviewUri(imgUri);
+			tokens[idx].attrs[srcIndex][1] = imgPanelUri;
+		}
+		return imageDefault(tokens, idx, options, env, self);
+	}
 
 	var result = md.render((fs.readFileSync(file.fsPath, "utf8")));
 
