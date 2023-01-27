@@ -249,11 +249,7 @@ export function loadPage(target: TargetStep, env: KatapodEnvironment) {
 		const codeEleClasses = suppressExecution ? "codeblock nonexecutable" : "codeblock executable";
 		const codeEle = `<code id="${parsedCommand.codeBlockId}" class="${codeEleClasses}">`;
 
-		return `${aSpanEle}
-		${preEle}
-		${codeEle}${renderedCode}</code>
-		</pre>
-		${aSpanEleCloser}`;
+		return `${aSpanEle}${preEle}${codeEle}${renderedCode}</code></pre>${aSpanEleCloser}`;
 
 	};
 
