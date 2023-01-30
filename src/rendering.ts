@@ -25,37 +25,7 @@ const stepPageHtmlPrefix = `
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.7.0/build/styles/default.min.css">
-		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/css/katapod.css" />
-		<style>
-			pre code.executable {
-				cursor: pointer;
-				background-color: lightgray;
-			}
-			pre code.nonexecutable {
-				cursor: default;
-				background-color: #B0CFFF;
-			}
-			a.codeblock {
-				text-decoration: none;
-			}
-			pre code.codeblock {
-				text-decoration: none;
-				color: black;
-				padding: 10px 10px;
-				margin-left: 10px;
-				width: 98%;
-				display: block;
-			}
-			pre code.executed {
-				box-shadow: -8px 0px 0px 0px rgba(0, 0, 0, 1.0);
-			}
-			pre code.codeblock:focus {
-				outline: none !important;
-			}
-			code.inline_code {
-				color: #7F1FAA;
-			}
-		</style>
+		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/css/katapodv2.css" />
 		<script src="https://datastax-academy.github.io/katapod-shared-assets/js/katapod.js"></script>
 		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/quiz/quiz.css" />
 		<link rel="stylesheet" type="text/css" href="https://datastax-academy.github.io/katapod-shared-assets/quiz/page.css" />
